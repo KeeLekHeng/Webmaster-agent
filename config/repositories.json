@@ -1,0 +1,11 @@
+{
+  "estateplanning": {
+    "owner": "KeeLekHeng",
+    "name": "sisweb",
+    "base_branch": "main",
+    "read_paths": ["package.json", "pnpm-lock.yaml", "next.config.ts"],
+    "patch_paths": ["next.config.ts"],
+    "allow_pr_creation": false,
+    "approver_ids": []
+  }
+}

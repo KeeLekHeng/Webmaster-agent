@@ -1,0 +1,6 @@
+{
+  "enabled": false,
+  "site_id": "estateplanning",
+  "interval_minutes": 1440,
+  "notify": "none"
+}
