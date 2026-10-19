@@ -69,6 +69,12 @@ GitHub writes were performed. Owner enrollment, scoped GitHub credentials and
 verification of live branch protection/provider access remain prerequisites for
 publishing; see `MILESTONE_4.md`.
 
+After explicit owner authorization, the policy was extended with a per-repository
+unprotected-branch exception and normal PR mode for GitHub Free. An eligible local
+owner approved the unchanged artifact hash, and `sisweb` PR #2 was created and
+verified: one file matching the approved content, open/unmerged, auto-merge off.
+All 125 tests pass. The audit graph still cannot publish or merge automatically.
+
 **Acceptance:** Unapproved changes cannot be pushed; approver identity and exact diff hash checked by code; simulated missing/expired approval blocks execution; GitHub token has minimum required permissions.
 
 ## Milestone 5 — SEO / performance insights
@@ -111,3 +117,16 @@ Do **not** scaffold all modules before their scope is justified. Keep runtime, s
 - Deployment software and cloud vendor; inspect existing environment, then choose portable options.
 - Approval UI and notification channel; start with CLI/manual review until needed.
 - Multi-agent orchestration and autonomous remediation; not needed to demonstrate value.
+
+## Milestone 5 implementation status (2026-10-19)
+Public SEO checks and safe Lighthouse/PageSpeed lab JSON import implemented locally.
+Live public validation: nine HTTP 200 routes, eight HTML pages, no new SEO findings;
+robots and sitemap available (17 sitemap locations, none followed).
+Manual PageSpeed collection and a six-node period-review graph now support
+Search Console totals/pages, numeric changes, comparable lab medians and optional
+Claude investigation of evidence-backed decline/improvement candidates.
+Owner selected seven-day comparisons and confirmed browser Search Console access.
+Guardian OAuth authorization is not configured. One PageSpeed attempt was unavailable;
+no live score was saved. Analytics, query-level ranking data, automatic OAuth refresh
+and scheduled collection remain pending. See `PERIOD_REVIEWS.md` for acceptance,
+commands, thresholds and actual data limitations. Real business outcomes are not yet validated.

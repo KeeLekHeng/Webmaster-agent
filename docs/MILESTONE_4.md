@@ -67,7 +67,7 @@ These checks establish artifact integrity/application, not functional correctnes
 The proposal also does not prove the cited finding semantically warrants the patch;
 that is part of human review.
 
-## Approval and publishing policy
+## Approval and publishing policy (initial defaults)
 
 Defaults are `allow_pr_creation: false` and `approver_ids: []`. A missing response
 does not authorize anything. Owner enrollment and enabling publishing are separate
@@ -150,3 +150,41 @@ branch protection and real PR publishing remain unverified/disabled. Milestone 4
 local implementation is ready for review; no claim of live publishing acceptance
 is made. Production deployment remains human-only; local approval trust and human
 review capacity remain known limits.
+
+## Owner-authorized GitHub Free publishing update
+
+The owner subsequently explicitly authorized adjusting Guardian to open the
+reviewed PR without branch protection. `RepoConfig` now supports
+`require_protected_branch` (default true), a required rationale for exceptions,
+and `draft_pr` (default true). The `estateplanning` configuration records the
+exception and normal PR mode for this private GitHub Free repository.
+The unchanged-base and exact-content checks remain mandatory. No merge or
+deployment operation was added, and no GitHub protection setting was changed.
+
+The local owner is enrolled through ignored `data/repositories.local.json`, chosen
+by `GUARDIAN_REPOSITORIES` in `.env`. It enables manual publishing for the configured
+site and names the actual local OS principal. The tracked policy still defaults to
+publishing disabled with no enrolled principals. Each patch still needs an exact
+hash-bound, short-lived approval; audits/scheduling do not request approvals or
+invoke publishing. Credentials remain in `.env` and were not printed or committed.
+
+Live result: https://github.com/KeeLekHeng/sisweb/pull/2
+
+- Title: Add an initial one-day HSTS response policy.
+- Normal PR (`draft: false`), open and not merged; auto-merge is disabled.
+- Head: `guardian/2c6fe0c3eb014de9bb193d6dd251f1bc`.
+- Head commit: `28eb3973406c117e063196f98560adb20aeed269`.
+- The only changed file is `next.config.ts`; its GitHub blob hash matches the
+  exact previously approved replacement.
+- Artifact hash remains
+  `087880e2637caa3b14ee2b5a0c34ad069faea555d51eb1ffd5227602ea671444`.
+- The approval was recorded and consumed through Guardian, and the live API
+  receipt was verified and saved in the local proposal bundle.
+
+The updated suite passes 125 tests, including explicit unprotected-branch
+authorization, missing-rationale rejection, and retained rejection of missing
+approvals and moved base commits. The write token successfully performed the
+specific branch/content/PR operations; broader credential scope was not attested.
+Website build/application tests remain unexecuted. No merge or deployment occurred.
+The local approval trust boundary and lack of GitHub-enforced protection remain
+known limits explicitly accepted for this owner-operated workflow.

@@ -20,6 +20,24 @@ def main():
     commands.add_parser("explain", help="Explain the LangGraph workflow without network access")
     commands.add_parser("stop", help="Create the persistent local kill switch")
     commands.add_parser("resume", help="Remove the persistent local kill switch")
+    review = commands.add_parser("review", help="Compare search visibility and lab speed across equal periods")
+    review.add_argument("--site", required=True)
+    review.add_argument("--config", default=os.getenv("GUARDIAN_CONFIG", "config/sites.json"))
+    review.add_argument("--output", default=os.getenv("GUARDIAN_OUTPUT", "reports"))
+    review.add_argument("--property", dest="property_name", default=os.getenv("GUARDIAN_GSC_PROPERTY"))
+    review.add_argument("--days", type=int, choices=[7, 28], default=7)
+    review.add_argument("--end-date", help="Last current-period date, YYYY-MM-DD in Pacific time")
+    review.add_argument("--input-search", help="Import normalized search-periods.json instead of calling Google")
+    review.add_argument("--performance-sample", action="append", default=[], help="Repeat for each Lighthouse lab sample")
+    review.add_argument("--performance-dir", help="Default: data/performance/<site>; used when no explicit samples supplied")
+    review.add_argument("--llm", choices=["none", "demo", "claude"], default="none")
+    review.add_argument("--model", default=os.getenv("GUARDIAN_MODEL"))
+    speed = commands.add_parser("performance-sample", help="Run one explicit public PageSpeed lab measurement")
+    speed.add_argument("--site", required=True)
+    speed.add_argument("--config", default=os.getenv("GUARDIAN_CONFIG", "config/sites.json"))
+    speed.add_argument("--url", required=True)
+    speed.add_argument("--strategy", choices=["mobile", "desktop"], default="mobile")
+    speed.add_argument("--output", help="Default: data/performance/<site>")
     for name in ("history", "alerts"):
         view = commands.add_parser(name)
         view.add_argument("--site", required=True)
@@ -32,6 +50,8 @@ def main():
     scan.add_argument("--llm", choices=["none", "demo", "claude"], default="none")
     scan.add_argument("--model", default=os.getenv("GUARDIAN_MODEL"))
     scan.add_argument("--input-report", help="Replay saved JSON evidence without scanning the website")
+    scan.add_argument("--seo", action="store_true", help="Include bounded public SEO/discovery checks")
+    scan.add_argument("--lighthouse-report", help="Import a Lighthouse or PageSpeed JSON lab result for this site")
     scan.add_argument("--database", default=os.getenv("GUARDIAN_DB", "data/guardian.sqlite3"))
     scan.add_argument("--notify", choices=["none", "local"], default="none")
     due = commands.add_parser("run-due", help="One-shot dispatcher; scheduling must be explicitly enabled")
@@ -73,6 +93,31 @@ def main():
         return 0
     try:
         enabled()
+        if args.command in ("review", "performance-sample"):
+            from datetime import date
+            import re
+            if not re.fullmatch(r"[A-Za-z0-9_-]{1,100}", args.site):
+                raise ValueError("Invalid site storage identifier")
+            configs = json.loads(Path(args.config).read_text(encoding="utf-8"))
+            config = SiteConfig.model_validate(configs[args.site])
+            sample_directory = Path("data/performance") / args.site
+            if args.command == "performance-sample":
+                from .performance import collect_pagespeed
+                path = collect_pagespeed(args.url, config, args.output or sample_directory, args.strategy)
+                print(f"Saved one dated lab measurement: {path}. No retrospective visitor-performance claim.")
+                return 0
+            if args.llm == "claude" and (not os.getenv("ANTHROPIC_API_KEY") or not args.model):
+                raise ValueError("Claude configuration required")
+            from .period_review import run_review
+            samples = args.performance_sample or [str(p) for p in sorted(Path(args.performance_dir or sample_directory).glob("*.json"))]
+            result = run_review({"site_id": args.site, "config": config, "output": args.output,
+                                 "property_name": args.property_name or config.base_url.rstrip("/") + "/",
+                                 "days": args.days, "end": date.fromisoformat(args.end_date) if args.end_date else None,
+                                 "input_path": args.input_search, "lighthouse_paths": samples,
+                                 "mode": args.llm, "model": args.model})
+            print(result["report"].summary)
+            print(f"Saved review: {Path(result['directory']) / 'summary.md'}")
+            return 1 if result["report"].status == "partial" or result["report"].analysis.status in ("unavailable", "partial", "rejected") else 0
         if args.command == "run-due":
             from .scheduling import ScheduleConfig, dispatch
             from .workflow import run_workflow
@@ -94,13 +139,22 @@ def main():
             parser.exit(2, "Claude needs ANTHROPIC_API_KEY and GUARDIAN_MODEL (or --model); no request made.\n")
         configs = json.loads(Path(args.config).read_text(encoding="utf-8"))
         config = SiteConfig.model_validate(configs[args.site])
+        if args.input_report and (args.seo or args.lighthouse_report):
+            raise ValueError("Replay cannot be combined with new observations")
+        config.seo_checks = config.seo_checks or args.seo
+        if args.lighthouse_report:
+            from .performance import import_lighthouse
+            import_lighthouse(args.lighthouse_report, config)  # Validate before any web requests.
         from .workflow import run_workflow
         result = run_workflow({"site_id": args.site, "config": config, "mode": args.llm,
                                "model": args.model, "input_report": args.input_report, "output": args.output,
-                               "database": args.database, "notify": args.notify})
+                               "database": "" if args.lighthouse_report else args.database, "notify": args.notify,
+                               "lighthouse_report": args.lighthouse_report})
         report = result["report"]
         directory = Path(result["directory"])
-    except (ValueError, KeyError, OSError, sqlite3.Error) as exc:
+    except (ValueError, KeyError, OSError, sqlite3.Error, httpx.HTTPError) as exc:
+        if type(getattr(exc, "google_status", None)) is int:
+            parser.exit(2, f"Google API returned HTTP {exc.google_status}; check API access/key/quota. No measurement saved. Raw response omitted.\n")
         parser.exit(2, f"Audit could not start/save ({type(exc).__name__}); check configuration and permissions.\n")
     print(report.summary)
     print(f"Summary saved: {directory / 'summary.md'}")

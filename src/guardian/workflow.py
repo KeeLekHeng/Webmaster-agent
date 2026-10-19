@@ -33,6 +33,7 @@ class AuditState(TypedDict, total=False):
     validated_at: str
     database: str
     notify: Literal["none", "local"]
+    lighthouse_report: str | None
 
 
 def build_graph(collector=audit, investigator=None):
@@ -41,6 +42,8 @@ def build_graph(collector=audit, investigator=None):
 
     def validate(state):
         enabled()
+        if state.get("lighthouse_report") and (state.get("input_report") or state.get("database")):
+            raise ValueError("Imported lab results require history disabled and no replay")
         config = SiteConfig.model_validate(state["config"])
         validate_url(config.base_url.rstrip("/") + "/", config)
         for path in config.seed_paths:
@@ -65,6 +68,14 @@ def build_graph(collector=audit, investigator=None):
         else:
             report = collector(state["site_id"], state["config"])
             source_run_id = None
+        if state.get("lighthouse_report"):
+            if state.get("input_report") or state.get("database"):
+                raise ValueError("Imported lab reports cannot update live history or replay evidence")
+            from .performance import import_lighthouse
+            evidence = import_lighthouse(state["lighthouse_report"], state["config"])
+            evidence.id = f"E{len(report.evidence) + 1:03d}"
+            report.evidence.append(evidence)
+            report.limitations.append("Imported Lighthouse lab measurement: see its original evidence timestamp. Artifact authenticity is not independently verified. It is not field Core Web Vitals, indexing, traffic or conversion evidence. Live history/alerts are disabled for this mixed report; no regression claim is made.")
         report.analysis = AnalysisResult(mode=state["mode"], source_run_id=source_run_id,
                                          model=state.get("model") if state["mode"] == "claude" else None)
         report.tools["langgraph"] = version("langgraph")

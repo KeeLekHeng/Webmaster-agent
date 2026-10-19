@@ -2,7 +2,7 @@
   "estateplanning": {
     "base_url": "https://estateplanning.com.my",
     "allowed_hosts": ["estateplanning.com.my", "www.estateplanning.com.my"],
-    "allowed_paths": ["/", "/api/health", "/about-us", "/services", "/blogs", "/contact-us", "/will-writing", "/trust-planning", "/careers"],
+    "allowed_paths": ["/", "/api/health", "/about-us", "/services", "/blogs", "/contact-us", "/will-writing", "/trust-planning", "/careers", "/robots.txt", "/sitemap.xml"],
     "seed_paths": ["/", "/api/health"],
     "max_pages": 9,
     "max_requests": 18,

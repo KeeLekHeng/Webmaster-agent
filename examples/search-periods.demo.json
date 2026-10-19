@@ -1,0 +1,26 @@
+{
+  "site_id": "demo",
+  "property": "https://example.com/",
+  "collected_at": "2026-10-01T12:00:00+00:00",
+  "source": "synthetic-demo",
+  "search_type": "web",
+  "data_state": "final",
+  "previous": {
+    "start": "2026-08-01",
+    "end": "2026-08-28",
+    "status": "available",
+    "totals": {"clicks": 100, "impressions": 1000, "ctr": 0.1, "position": 5},
+    "pages": {
+      "https://example.com/service": {"clicks": 50, "impressions": 500, "ctr": 0.1, "position": 5}
+    }
+  },
+  "current": {
+    "start": "2026-08-29",
+    "end": "2026-09-25",
+    "status": "available",
+    "totals": {"clicks": 60, "impressions": 1000, "ctr": 0.06, "position": 7},
+    "pages": {
+      "https://example.com/service": {"clicks": 20, "impressions": 500, "ctr": 0.04, "position": 8}
+    }
+  }
+}

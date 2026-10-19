@@ -123,7 +123,7 @@ def make_proposal(site_id, repository, replacement, path, report, evidence_ids, 
         "Validation checks artifact hashes, diff reconstruction and git apply --check in a temporary copy. No website build, package installation, "
         "application tests, contact submissions or live traffic tests were run.\n"
         "PR publishing is disabled by default and requires an eligible OS user, exact hash, unexpired approval, "
-        "protected unchanged base branch and separate scoped write credential. Merge/deploy remain human-only.\n", encoding="utf-8")
+        "an unchanged base branch, configured protection policy and separate scoped write credential. Merge/deploy remain human-only.\n", encoding="utf-8")
     return directory, digest
 
 
@@ -254,7 +254,7 @@ class ApprovalStore:
                        (utcnow().isoformat(), proposal_id, "create_pull_request", identity(), outcome))
 
 
-def create_pull_request(directory, config, site_id, approval_id, store, token, client=None):
+def create_pull_request(directory, config, site_id, approval_id, store, token, client=None, title=None, body=None):
     enabled()
     if not config.allow_pr_creation:
         store.denied("unvalidated", "denied_disabled_policy")
@@ -274,11 +274,22 @@ def create_pull_request(directory, config, site_id, approval_id, store, token, c
     if github._request("GET", "").get("default_branch") != config.base_branch:
         raise PolicyError("Configured base is not the repository default branch")
     revision, protected = github.branch()
-    if revision != manifest["base_sha"] or not protected:
-        raise PolicyError("Base branch moved or is not protected; prepare/review a fresh proposal")
+    if revision != manifest["base_sha"]:
+        raise PolicyError("Base branch moved; prepare/review a fresh proposal")
+    if config.require_protected_branch and not protected:
+        raise PolicyError("Repository policy requires a protected base branch")
     original = github.read(manifest["path"], revision)
     if sha(original) != manifest["before_sha256"]:
         raise PolicyError("Remote base content differs from approved proposal")
+    title = title or "Website Guardian: reviewed patch proposal"
+    body = body or (f"Human-reviewed proposal {manifest['proposal_id']}. Artifact SHA-256: {digest}. "
+                   "Artifact integrity and isolated git apply checked; website build/tests not executed. Human merge/deployment required.")
+    if (len(title) > 200 or len(body) > 12000 or "\n" in title
+            or re.search(r"sk-ant-|github_pat_|gh[pousr]_", title + body)):
+        raise PolicyError("PR title/body exceeds limits or contains a potential credential")
+    if not protected:
+        body += "\n\nOwner-authorized unprotected-branch exception: " + config.unprotected_branch_reason
+        body += "\nGuardian has no merge or deployment operation. Human merge/deployment required."
     store.consume(manifest, digest, approval_id, config)
     branch = "guardian/" + manifest["proposal_id"]
     def write(method, suffix, **kwargs):
@@ -289,10 +300,8 @@ def create_pull_request(directory, config, site_id, approval_id, store, token, c
         write("POST", "/git/refs", json={"ref": "refs/heads/"+branch, "sha": revision})
         write("PUT", "/contents/"+manifest["path"], json={"message": "Website Guardian proposal " + manifest["proposal_id"],
             "content": base64.b64encode(content).decode(), "sha": manifest["blob_sha"], "branch": branch})
-        result = write("POST", "/pulls", json={"title": "Website Guardian: reviewed patch proposal",
-            "head": branch, "base": config.base_branch, "draft": True,
-            "body": f"Human-reviewed proposal {manifest['proposal_id']}. Artifact SHA-256: {digest}. "
-                    "Artifact integrity and isolated git apply checked; website build/tests not executed. Human merge/deployment required."})
+        result = write("POST", "/pulls", json={"title": title,
+            "head": branch, "base": config.base_branch, "draft": config.draft_pr, "body": body})
         url = result.get("html_url", "")
         if not re.fullmatch(r"https://github\.com/"+re.escape(config.owner+"/"+config.name)+r"/pull/\d+", url):
             raise PolicyError("Unexpected PR receipt; manual reconciliation required")

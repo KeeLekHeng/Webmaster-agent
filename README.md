@@ -164,7 +164,9 @@ Copy `.env.example` to `.env` if setting up another checkout.
 
 Milestone 4 adds manual repository inspection and isolated proposal/approval
 commands. The audit graph does not call them. Repository policy lives in
-`config/repositories.json`; publishing is disabled and no approvers are enrolled.
+`config/repositories.json`. Publishing is disabled in the tracked defaults;
+owner enrollment is stored in an ignored local policy selected through
+`GUARDIAN_REPOSITORIES` in `.env`.
 No repository/environment secrets are copied, and no website scripts are run.
 
 ```powershell
@@ -182,21 +184,46 @@ bounded `evidence.json`, a hash-bound manifest and `REVIEW.md` under `data/propo
 `proposal-check` reconstructs the diff, verifies hashes, and runs `git apply --check`
 in a temporary copy. It does not run a website build or its application tests.
 
-Future publishing requires explicit owner enrollment, an exact artifact-hash
+Publishing requires explicit owner enrollment, an exact artifact-hash
 approval with a 1–60 minute expiry, enabled repository policy, and a separate
 repository-scoped `GUARDIAN_GITHUB_WRITE_TOKEN`. The authenticated local OS user
 is shown by `guardian identity`. CLI commands `approve`, `revoke` and `create-pr`
 implement this manual flow; none is invoked by an audit or scheduler. Branch
-protection, unchanged base content, scope, expiry, revocation and the kill switch
+protection policy, unchanged base content, scope, expiry, revocation and the kill switch
 are checked before publishing. Approvals are consumed once; partial API failures
 require manual reconciliation rather than automatic retry. Publishing creates
-an isolated branch and draft PR only. Merge/deployment stay human-only.
+an isolated branch and PR only. `draft_pr` chooses draft/normal mode.
+Merge/deployment stay human-only.
 
 See [Milestone 4 details](docs/MILESTONE_4.md) for commands, credential permissions,
-the local approval trust boundary and validation limits. No real approval or
-remote publishing has been performed.
+the local approval trust boundary and validation limits. The owner explicitly
+authorized an unprotected-branch exception for `estateplanning` on GitHub Free:
+`require_protected_branch: false` with a recorded rationale, and `draft_pr: false`.
+Other configurations require a protected branch by default. Exact-patch approval
+and unchanged base checks apply in either mode. The first live result is
+[sisweb PR #2](https://github.com/KeeLekHeng/sisweb/pull/2), open and unmerged with
+auto-merge disabled. This exception does not make the token itself merge-proof.
 
 Rollback: stop local runs, preserve any wanted reports/database, and revert code
 or remove the local environment and generated data. There is no website deployment
 or production configuration to roll back. Retention is manual; no automatic data
 deletion is enabled.
+
+Milestone 5 adds optional public SEO checks (`guardian audit --site estateplanning --seo`)
+and Lighthouse/PageSpeed JSON import (`--lighthouse-report path/to/report.json`).
+Imported lab results preserve measurement dates and disable live history/alerts.
+Manual period reviews and PageSpeed collection are now implemented; Google account/API
+authorization and actual historical measurements remain pending. Owner-selected
+reporting default is seven days versus the previous seven days.
+See [Milestone 5 outcomes and commands](docs/MILESTONE_5.md).
+
+```powershell
+guardian review --site estateplanning --llm claude
+guardian performance-sample --site estateplanning --url https://estateplanning.com.my/ --strategy mobile
+```
+
+Reviews compare search clicks, impressions, CTR and average position, then provide
+evidence-backed investigation/improvement actions with optional Claude reasoning.
+See [period reviews and Google access](docs/PERIOD_REVIEWS.md). Search Console access
+in the owner's browser is confirmed; Guardian's read-only OAuth connection is not
+configured yet. Synthetic examples are explicitly labeled and are not live results.

@@ -11,6 +11,7 @@ from urllib.parse import urljoin, urlsplit, urldefrag
 from . import __version__
 from .models import Evidence, Finding, Report
 from .network import PolicyError, Transport, enabled, validate_url
+from .seo import inspect_duplicate_titles, inspect_page, inspect_resources
 
 
 def now():
@@ -25,6 +26,9 @@ class Page(HTMLParser):
         self.canonical = ""
         self.links = []
         self.in_title = False
+        self.robots = []
+        self.h1_count = 0
+        self.canonical_count = 0
 
     def handle_starttag(self, tag, attrs):
         a = dict(attrs)
@@ -34,6 +38,11 @@ class Page(HTMLParser):
             self.description = a.get("content", "")
         if tag == "link" and "canonical" in a.get("rel", "").lower().split():
             self.canonical = a.get("href", "")
+            self.canonical_count += 1
+        if tag == "meta" and a.get("name", "").lower() in ("robots", "googlebot"):
+            self.robots.append(a.get("content", ""))
+        if tag == "h1":
+            self.h1_count += 1
         if tag == "a" and a.get("href"):
             self.links.append(a["href"])
 
@@ -89,6 +98,7 @@ def audit(site_id, config, transport=None):
 
     queue = [(urljoin(root, p), None) for p in config.seed_paths]
     visited = set()
+    seo_pages = []
     while queue and len(visited) < config.max_pages:
         url, referrer = queue.pop(0)
         if url in visited:
@@ -169,6 +179,8 @@ def audit(site_id, config, transport=None):
             if missing_meta:
                 finding("Missing basic page metadata", "info", mid,
                         "Review the page title, description and canonical metadata where applicable.")
+            if config.seo_checks:
+                seo_pages.append(inspect_page(page, current, response.headers, config, record, finding))
             for href in page.links:
                 candidate = urldefrag(urljoin(current, href))[0]
                 try:
@@ -185,6 +197,17 @@ def audit(site_id, config, transport=None):
                 break
     if queue:
         report.limitations.append("Page budget reached; additional eligible links were not checked.")
+    if config.seo_checks:
+        inspect_duplicate_titles(seo_pages, finding)
+        duplicate_ids = {eid for f in report.findings if f.title == "Duplicate page titles in checked pages" for eid in f.evidence_ids}
+        for evidence in report.evidence:
+            if evidence.id in duplicate_ids:
+                evidence.outcome = "finding"
+        if inspect_resources(root, config, transport, record, finding):
+            report.status = "partial"
+        report.tools["seo_checks"] = "guardian-seo/1"
+        report.limitations += ["SEO checks describe sampled public markup and discovery files, not actual indexing or rankings.",
+                               "Search Console/analytics are not connected; traffic, conversions and causal business effects are unknown."]
     report.finished_at = now()
     rank = {"high": 0, "medium": 1, "low": 2, "info": 3}
     report.findings.sort(key=lambda f: rank[f.severity])

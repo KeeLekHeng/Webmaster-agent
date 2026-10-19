@@ -17,7 +17,7 @@ def register(commands):
     for name in sorted(COMMANDS - {"identity"}):
         cmd = commands.add_parser(name)
         cmd.add_argument("--site", required=True)
-        cmd.add_argument("--repositories", default="config/repositories.json")
+        cmd.add_argument("--repositories", default=os.getenv("GUARDIAN_REPOSITORIES", "config/repositories.json"))
         if name in ("repo-inspect", "propose"):
             cmd.add_argument("--repo-path", help="Read committed local files instead of GitHub API")
         if name == "propose":
@@ -35,6 +35,9 @@ def register(commands):
             cmd.add_argument("--minutes", type=int, default=30)
         if name in ("revoke", "create-pr"):
             cmd.add_argument("--approval-id", required=True)
+        if name == "create-pr":
+            cmd.add_argument("--title-file")
+            cmd.add_argument("--body-file")
 
 
 def run(args):
@@ -76,7 +79,15 @@ def run(args):
         store.revoke(args.approval_id, config, args.site)
         print("Approval revoked.")
     elif args.command == "create-pr":
+        def text_file(path, limit):
+            if not path:
+                return None
+            file = Path(path)
+            if file.stat().st_size > limit:
+                raise ValueError("PR text exceeds size limit")
+            return file.read_text(encoding="utf-8").strip()
         url = create_pull_request(args.proposal, config, args.site, args.approval_id, store,
-                                  os.getenv("GUARDIAN_GITHUB_WRITE_TOKEN"))
-        print(f"Draft PR created: {url}. Human merge/deployment required.")
+                                  os.getenv("GUARDIAN_GITHUB_WRITE_TOKEN"),
+                                  title=text_file(args.title_file, 200), body=text_file(args.body_file, 12000))
+        print(f"{'Draft PR' if config.draft_pr else 'PR'} created: {url}. Human merge/deployment required.")
     return 0

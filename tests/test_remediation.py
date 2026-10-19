@@ -75,7 +75,7 @@ def github_client(config, *, revision=BASE, protected=True, fail_write=False, sy
             assert payload["branch"] != "main"
             return httpx.Response(200, json={"commit": {"sha": "c"*40}})
         if request.method == "POST" and path == prefix + "/pulls":
-            assert json.loads(request.content)["draft"] is True
+            assert json.loads(request.content)["draft"] is config.draft_pr
             return httpx.Response(201, json={"html_url": "https://github.com/owner/repo/pull/1"})
         pytest.fail("Unapproved API mutation")
     return httpx.Client(transport=httpx.MockTransport(handler)), calls
@@ -316,3 +316,46 @@ def test_approval_rechecked_between_remote_mutations(config, proposal, monkeypat
     with pytest.raises(PolicyError):
         create_pull_request(directory, config, "example", approval, store, "synthetic-token", client)
     assert [method for method, _, _ in calls if method != "GET"] == ["POST"]
+
+
+def test_owner_exception_allows_regular_pr_without_branch_protection(config, proposal):
+    directory, digest, store = proposal
+    config = RepoConfig.model_validate({**config.model_dump(), "require_protected_branch": False,
+        "unprotected_branch_reason": "Owner-approved private Free repository workflow.",
+        "allow_pr_creation": True, "draft_pr": False})
+    approval = store.approve(directory, config, "example", digest)
+    client, calls = github_client(config, protected=False)
+    url = create_pull_request(directory, config, "example", approval, store, "synthetic-token", client,
+                              title="Add reviewed response header", body="Review this proposed header change.")
+    assert url.endswith("/pull/1")
+    payload = calls[-1][2]
+    assert payload["draft"] is False
+    assert "Owner-authorized unprotected-branch exception" in payload["body"]
+    assert payload["title"] == "Add reviewed response header"
+    assert all("/merge" not in path for _, path, _ in calls)
+
+
+def test_unprotected_exception_requires_reason(config):
+    with pytest.raises(ValueError):
+        RepoConfig.model_validate({**config.model_dump(), "require_protected_branch": False})
+
+
+def test_unprotected_exception_still_rejects_missing_approval(config, proposal):
+    directory, _, store = proposal
+    config = RepoConfig.model_validate({**config.model_dump(), "require_protected_branch": False,
+        "unprotected_branch_reason": "Owner authorized.", "allow_pr_creation": True})
+    client, calls = github_client(config, protected=False)
+    with pytest.raises(PolicyError):
+        create_pull_request(directory, config, "example", "missing", store, "synthetic-token", client)
+    assert calls == []
+
+
+def test_unprotected_exception_still_rejects_moved_base(config, proposal):
+    directory, digest, store = proposal
+    config = RepoConfig.model_validate({**config.model_dump(), "require_protected_branch": False,
+        "unprotected_branch_reason": "Owner authorized.", "allow_pr_creation": True})
+    approval = store.approve(directory, config, "example", digest)
+    client, calls = github_client(config, revision="c"*40, protected=False)
+    with pytest.raises(PolicyError):
+        create_pull_request(directory, config, "example", approval, store, "synthetic-token", client)
+    assert all(method == "GET" for method, _, _ in calls)

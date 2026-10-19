@@ -1,6 +1,6 @@
 # Website Guardian — Project Blueprint
 
-**Status:** Local Milestones 1–3 implemented, with Milestone 4 proposal/approval tooling tested locally. Scheduled operation, external notifications and GitHub publishing remain disabled. **Initial site:** `https://estateplanning.com.my/`. **Owner:** Repository maintainer. **Last updated:** 2026-10-19.
+**Status:** Milestones 1–4 implemented locally, with the first owner-approved PR published. Scheduled operation and external notifications remain disabled; publishing is manual and approval-gated, with no merge/deployment operation. **Initial site:** `https://estateplanning.com.my/`. **Owner:** Repository maintainer. **Last updated:** 2026-10-19.
 
 ## 1. Why we are building this
 The owner maintains a family business website infrequently and wants a dependable, low-overhead way to detect and investigate website maintenance problems. The project is simultaneously (a) a hands-on agent engineering project using LangGraph and (b) an experiment in whether an AI-assisted website-care service would help small businesses. Commercial demand is **not validated**.

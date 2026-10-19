@@ -21,10 +21,10 @@ Return the requested structured Investigation only. An empty list is valid.
 
 def project_evidence(report):
     """No raw page text, headers, URLs, findings prose or exception text sent externally."""
-    checks = {"http", "tls", "metadata", "security_headers", "health_payload", "collection", "redirect"}
+    checks = {"http", "tls", "metadata", "security_headers", "health_payload", "collection", "redirect", "seo", "robots", "sitemap"}
     bool_keys = {"truncated", "hostname_and_chain_verified", "title_present",
-                 "description_present", "canonical_present", "status_ok"}
-    number_keys = {"status", "attempt", "days_remaining"}
+                 "description_present", "canonical_present", "status_ok", "noindex", "canonical_outside_site", "present", "homepage_allowed_by_basic_parser"}
+    number_keys = {"status", "attempt", "days_remaining", "h1_count", "canonical_count", "location_count", "outside_site_count", "locations_fetched"}
     known_missing = {"Strict-Transport-Security", "X-Content-Type-Options: nosniff",
                      "frame embedding restriction", "title", "description", "canonical"}
     evidence = []
@@ -53,8 +53,9 @@ def project_evidence(report):
 
 
 class ClaudeInvestigator:
-    def __init__(self, model):
+    def __init__(self, model, system=SYSTEM):
         self.model = model
+        self.system = system
         self.usage = {}
 
     def __call__(self, payload):
@@ -70,7 +71,7 @@ class ClaudeInvestigator:
                                  timeout=30, max_retries=0,
                                  http_client=httpx.Client(trust_env=False, timeout=30)) as client:
             response = client.messages.parse(
-                model=self.model, max_tokens=1800, system=SYSTEM,
+                model=self.model, max_tokens=1800, system=self.system,
                 messages=[{"role": "user", "content": json.dumps(payload, allow_nan=False)}],
                 output_format=Investigation)
             if response.stop_reason != "end_turn" or response.parsed_output is None:

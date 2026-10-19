@@ -46,6 +46,12 @@ def build_summary(report: Report, max_issues=5):
     tls = [e for e in report.evidence if e.check == "tls" and e.outcome == "passed"]
     if tls and type(tls[-1].details.get("days_remaining")) in (int, float):
         lines.append(f"TLS check passed; {tls[-1].details['days_remaining']:g} certificate days remained at observation time.")
+    seo = [e for e in report.evidence if e.check == "seo"]
+    if seo:
+        lines.append(f"SEO: {len(seo)} HTML page(s) sampled; robots/sitemap details are in the full report. Indexing, rankings and traffic were not measured.")
+    for e in report.evidence:
+        if e.check == "lighthouse" and e.details.get("imported") is True:
+            lines.append(f"Imported Lighthouse lab result ({plain(e.details.get('strategy'))}), measured {plain(e.timestamp)}: performance score {plain(e.details.get('performance_score'))}/100. Artifact authenticity unverified; no field-data or regression claim. Live history/alerts disabled.")
     if unavailable:
         lines.append(f"Coverage warning: {unavailable} check(s) blocked or unavailable; collection errors do not establish an outage.")
     if report.status != "complete":

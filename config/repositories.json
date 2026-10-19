@@ -6,6 +6,9 @@
     "read_paths": ["package.json", "pnpm-lock.yaml", "next.config.ts"],
     "patch_paths": ["next.config.ts"],
     "allow_pr_creation": false,
+    "require_protected_branch": false,
+    "unprotected_branch_reason": "Owner explicitly authorized reviewed PR publishing for this private GitHub Free repository; merges and deployment remain human-only.",
+    "draft_pr": false,
     "approver_ids": []
   }
 }

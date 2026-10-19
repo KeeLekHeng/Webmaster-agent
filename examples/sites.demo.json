@@ -1,0 +1,7 @@
+{
+  "demo": {
+    "base_url": "https://example.com",
+    "allowed_hosts": ["example.com"],
+    "allowed_paths": ["/", "/service"]
+  }
+}

@@ -42,6 +42,9 @@ class RepoConfig(BaseModel):
     read_paths: list[str]
     patch_paths: list[str]
     allow_pr_creation: bool = False
+    require_protected_branch: bool = True
+    unprotected_branch_reason: str | None = None
+    draft_pr: bool = True
     approver_ids: list[str] = []
 
     @model_validator(mode="after")
@@ -50,6 +53,8 @@ class RepoConfig(BaseModel):
             safe_path(path)
         if not set(self.patch_paths) <= set(self.read_paths):
             raise ValueError("Patch paths must also be readable")
+        if not self.require_protected_branch and not (self.unprotected_branch_reason or "").strip():
+            raise ValueError("An explicit owner rationale is required for an unprotected-branch exception")
         return self
 
 

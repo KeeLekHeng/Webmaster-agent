@@ -12,6 +12,7 @@ class SiteConfig(BaseModel):
     timeout: float = Field(default=8, gt=0, le=30)
     delay: float = Field(default=0.5, ge=0.1, le=10)
     max_bytes: int = Field(default=524288, ge=1024, le=1048576)
+    seo_checks: bool = False
 
 
 class Evidence(BaseModel):
