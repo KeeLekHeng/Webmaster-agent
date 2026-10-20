@@ -3,6 +3,7 @@ import hashlib
 import json
 import os
 import re
+import time
 
 from .models import Investigation, InvestigationNote
 from .network import enabled
@@ -52,6 +53,35 @@ def project_evidence(report):
     return payload, hashlib.sha256(encoded.encode()).hexdigest()
 
 
+def investigation_failure_notice(exc):
+    """Allowlisted diagnostics only; never exception messages, bodies or headers."""
+    reasons = {
+        "APITimeoutError": "request timed out",
+        "APIConnectionError": "provider connection failed",
+        "AuthenticationError": "provider authentication failed",
+        "PermissionDeniedError": "provider access denied",
+        "RateLimitError": "provider rate limit reached",
+        "NotFoundError": "model or provider resource not found",
+        "InternalServerError": "provider server error",
+        "ValidationError": "structured response validation failed",
+        "ValueError": "configuration or response validation failed",
+        "LengthFinishReasonError": "response output limit reached",
+    }
+    reason = reasons.get(type(exc).__name__, "unexpected investigation failure")
+    status = getattr(exc, "status_code", None)
+    if type(status) is int and 100 <= status <= 599:
+        reason += f"; HTTP {status}"
+    return f"Reasoning unavailable ({reason}); deterministic findings/actions retained. Raw errors are not stored."
+
+
+def retry_wait(seconds):
+    """Short waits keep the persistent kill switch responsive during backoff."""
+    for _ in range(seconds * 4):
+        enabled()
+        time.sleep(0.25)
+    enabled()
+
+
 class ClaudeInvestigator:
     def __init__(self, model, system=SYSTEM):
         self.model = model
@@ -66,18 +96,30 @@ class ClaudeInvestigator:
         key = os.getenv("ANTHROPIC_API_KEY")
         if not key or not self.model:
             raise ValueError("Claude configuration missing")
+        self.usage = {}
         # Fixed official endpoint; no proxy/base-URL overrides, tools or SDK retries.
         with anthropic.Anthropic(api_key=key, base_url="https://api.anthropic.com",
                                  timeout=30, max_retries=0,
                                  http_client=httpx.Client(trust_env=False, timeout=30)) as client:
-            response = client.messages.parse(
-                model=self.model, max_tokens=1800, system=self.system,
-                messages=[{"role": "user", "content": json.dumps(payload, allow_nan=False)}],
-                output_format=Investigation)
+            for attempt in range(4):  # Initial request plus at most three retries.
+                enabled()
+                try:
+                    response = client.messages.parse(
+                        model=self.model, max_tokens=1800, system=self.system,
+                        messages=[{"role": "user", "content": json.dumps(payload, allow_nan=False)}],
+                        output_format=Investigation)
+                    break
+                except (anthropic.APIConnectionError, anthropic.APIStatusError) as exc:
+                    status = getattr(exc, "status_code", None)
+                    transient = isinstance(exc, anthropic.APIConnectionError) or status in (408, 409, 429) or (type(status) is int and 500 <= status <= 599)
+                    if not transient or attempt == 3:
+                        raise
+                    retry_wait((2, 4, 8)[attempt])
             if response.stop_reason != "end_turn" or response.parsed_output is None:
                 raise ValueError("Incomplete or refused model output")
             self.usage = {"input_tokens": response.usage.input_tokens,
-                          "output_tokens": response.usage.output_tokens}
+                          "output_tokens": response.usage.output_tokens,
+                          "request_attempts": attempt + 1}
             return response.parsed_output
 
 

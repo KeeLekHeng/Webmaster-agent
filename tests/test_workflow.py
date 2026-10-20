@@ -185,7 +185,7 @@ def test_sdk_structured_output_without_network(monkeypatch):
     assert "tools" not in captured
     assert "output_config" in captured
     assert captured["max_tokens"] == 1800
-    assert client.usage == {"input_tokens": 50, "output_tokens": 60}
+    assert client.usage == {"input_tokens": 50, "output_tokens": 60, "request_attempts": 1}
 
 
 def test_no_external_tracing(config, report, tmp_path, monkeypatch):

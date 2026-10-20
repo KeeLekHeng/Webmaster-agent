@@ -11,7 +11,7 @@ from langgraph.graph import StateGraph, START, END
 from langsmith import tracing_context
 
 from .audit import now, save_report
-from .investigation import SYSTEM, ClaudeInvestigator, DemoInvestigator, filter_investigation
+from .investigation import SYSTEM, ClaudeInvestigator, DemoInvestigator, filter_investigation, investigation_failure_notice
 from .models import AnalysisResult, Evidence, Finding, Investigation, Report, SiteConfig
 from .network import enabled
 from .performance import import_lighthouse
@@ -40,6 +40,9 @@ what metric to recheck. Causes are hypotheses until corroborated; do not claim
 an algorithm update, competitor action or deployment caused a decline. Lighthouse
 comparisons are lab samples, never historical visitor performance. Do not promise
 ranking, conversion or revenue gains. Prioritize evidence-backed opportunities.
+When limited_volume is true, provide early-stage investigation advice rather than
+calling the change a regression. Query/content inspection has not been performed;
+do not imply actual keywords, search intent or page defects have been verified.
 """
 
 
@@ -66,8 +69,8 @@ def compare(snapshot, config, lighthouse_paths=()):
         report.evidence.append(Evidence(id=eid, source=source, timestamp=timestamp or snapshot.collected_at.isoformat(), check=check, outcome=outcome, details=details))
         return eid
 
-    def action(title, eid, step, signal, observations, severity="medium"):
-        report.findings.append(Finding(title=title, severity=severity, confidence="medium", evidence_ids=[eid], next_step=step))
+    def action(title, eid, step, signal, observations, severity="medium", confidence="medium"):
+        report.findings.append(Finding(title=title, severity=severity, confidence=confidence, evidence_ids=[eid], next_step=step))
         safe_evidence.append({"id": eid, "check": signal, "outcome": "finding", "observations": observations})
 
     windows = {name: getattr(snapshot, name) for name in ("previous", "current")}
@@ -99,6 +102,22 @@ def compare(snapshot, config, lighthouse_paths=()):
                 action(label + ": assess a search visibility opportunity", eid,
                        "Review the page's relevant queries and search intent in Search Console. Check competing results and whether the title/content answers that intent before proposing an experiment; low CTR alone does not establish underperformance.",
                        "search_visibility_opportunity", delta, "low")
+        if not report.findings and a.totals.impressions > 0 and min(b.totals.impressions, a.totals.impressions) < 100:
+            property_evidence = next(e for e in report.evidence if e.check == "search_comparison")
+            action("Early-stage review: investigate search visibility and query mix", property_evidence.id,
+                   "In Search Console, compare the queries and pages receiving impressions in both periods. Check whether broader visibility explains lower CTR/average position before rewriting content. Confirm priority service pages are indexed, then recheck impressions and relevant clicks after 14 days.",
+                   "early_stage_opportunity", {**changes(b.totals, a.totals), "limited_volume": True}, "info", "low")
+            for index, (url, metrics) in enumerate(sorted(a.pages.items(), key=lambda item: (-item[1].impressions, item[0]))[:3], 1):
+                if not metrics.impressions:
+                    continue
+                eid = record(url, "search_page_opportunity", "passed",
+                             {"current": metrics.model_dump(), "previous_observation_available": url in b.pages,
+                              "limited_volume": True})
+                action(f"Early-stage page opportunity P{index:03d}: review search intent and presentation", eid,
+                       "Inspect this page's actual queries in Search Console and compare its title, description and content with the intended service/search intent. Propose one focused improvement only after that review; track relevant impressions and clicks over the next 14 days. No query intent or content defect has been established yet.",
+                       "early_stage_page_opportunity", {"current": metrics.model_dump(), "limited_volume": True,
+                                                         "previous_observation_available": url in b.pages}, "info", "low")
+            report.limitations.append("Early-stage actions are low-confidence review opportunities, not measured regressions or proof of SEO defects. They do not require an alert threshold; inspect actual queries/content before choosing changes.")
         record(config.base_url.rstrip("/") + "/", "search_page_coverage", "passed",
                {"comparable_pages": len(b.pages.keys() & a.pages.keys()),
                 "previous_only_pages_unknown": len(b.pages.keys() - a.pages.keys()),
@@ -203,7 +222,7 @@ def summary(report, snapshot):
     for e in labs:
         d = e.details
         lines.append(f"- {plain(e.source)} ({plain(d['strategy'])}): {d['previous_samples']} previous / {d['current_samples']} current samples; median score {plain(d.get('previous_performance_score', 'unavailable'))} to {plain(d.get('current_performance_score', 'unavailable'))}. Evidence: {e.id}. Lab only; insufficient samples do not trigger actions.")
-    lines += ["", "## Limits and next data needed", ""] + ["- " + plain(x) for x in report.limitations]
+    lines += ["", "## Limits and next data needed", ""] + ["- " + plain(x) for x in report.limitations + report.analysis.notices]
     lines += ["", "[Full evidence and advisory reasoning](report.md) | [Structured report](report.json) | [Period input](search-periods.json)"]
     return "\n".join(lines) + "\n"
 
@@ -242,7 +261,7 @@ def run_review(state, progress=print, collector=collect_search, investigator=Non
             if snapshot.source == "google-api":
                 snapshot.source = "owner-import"  # Never trust an imported provenance label.
         else:
-            snapshot = collector(s["site_id"], s["config"], s["property_name"], s.get("days", 7), s.get("end"))
+            snapshot = collector(s["site_id"], s["config"], s["property_name"], s.get("days", 14), s.get("end"))
         return {"snapshot": validate_snapshot(snapshot, s["site_id"], s["config"])}
 
     def compare_period(s):
@@ -262,9 +281,9 @@ def run_review(state, progress=print, collector=collect_search, investigator=Non
                 candidate = Investigation.model_validate(client(s["payload"]))
                 report.analysis.usage = getattr(client, "usage", {})
                 report.analysis.status = "demo" if s["mode"] == "demo" else "complete"
-            except Exception:
+            except Exception as exc:
                 report.analysis.status = "unavailable"
-                report.analysis.notices.append("Reasoning unavailable; deterministic changes/actions retained. Raw API output omitted.")
+                report.analysis.notices.append(investigation_failure_notice(exc))
         return {"report": report, "candidate": candidate}
 
     def policy(s):

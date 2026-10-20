@@ -60,7 +60,12 @@ def test_small_samples_do_not_trigger_click_percentage_alarm(config):
     s.previous.totals = metrics(2, 10)
     s.current.totals = metrics(0, 5)
     s.previous.pages = s.current.pages = {}
-    assert compare(s, config)[0].findings == []
+    report, payload = compare(s, config)
+    assert len(report.findings) == 1
+    assert report.findings[0].severity == "info"
+    assert report.findings[0].confidence == "low"
+    assert "Early-stage" in report.findings[0].title
+    assert payload["untrusted_evidence"][0]["observations"]["limited_volume"] is True
 
 
 @pytest.mark.parametrize("field,value", [("clicks", float("nan")), ("ctr", .9), ("impressions", -1), ("position", 0)])
@@ -227,13 +232,36 @@ def test_google_api_budget_and_error_redaction():
     assert "SECRET" not in str(exc.value)
 
 
-def test_default_seven_day_windows(config):
+def test_model_failure_diagnostics_never_include_raw_error():
+    from guardian.investigation import investigation_failure_notice
+    timeout = type("APITimeoutError", (Exception,), {})("SECRET request details")
+    notice = investigation_failure_notice(timeout)
+    assert "timed out" in notice and "SECRET" not in notice
+    rate_limit = type("RateLimitError", (Exception,), {"status_code": 429})("SECRET")
+    notice = investigation_failure_notice(rate_limit)
+    assert "HTTP 429" in notice and "rate limit" in notice and "SECRET" not in notice
+
+
+def test_default_fourteen_day_windows(config):
     s = collect_search("test", config, "https://example.com/", end=date(2026, 9, 25), query=lambda b: {"responseAggregationType": "byPage" if b.get("dimensions") else "byProperty"})
-    assert (s.current.end - s.current.start).days == 6
-    assert s.current.start == date(2026, 9, 19)
+    assert (s.current.end - s.current.start).days == 13
+    assert s.current.start == date(2026, 9, 12)
 
 
-def test_cli_default_seven_days_and_site_sample_loading(config, tmp_path, monkeypatch):
+def test_low_volume_page_opportunities_are_bounded_and_sanitized(config):
+    s = snapshot()
+    s.previous.totals = metrics(3, 18, 14)
+    s.current.totals = metrics(8, 103, 43)
+    s.previous.pages = {}
+    s.current.pages = {"https://example.com/service": metrics(2, 50, 30)}
+    report, payload = compare(s, config)
+    assert len(report.findings) == 2
+    assert all(f.severity == "info" and f.confidence == "low" for f in report.findings)
+    assert "https://" not in json.dumps(payload)
+    assert payload["untrusted_evidence"][1]["observations"]["previous_observation_available"] is False
+
+
+def test_cli_default_fourteen_days_and_site_sample_loading(config, tmp_path, monkeypatch):
     import sys
     from guardian.cli import main
     from guardian.models import Report
@@ -251,6 +279,6 @@ def test_cli_default_seven_days_and_site_sample_loading(config, tmp_path, monkey
     monkeypatch.setattr(guardian.period_review, "run_review", review)
     monkeypatch.setattr(sys, "argv", ["guardian", "review", "--site", "test", "--config", str(cfg)])
     assert main() == 0
-    assert captured["days"] == 7
+    assert captured["days"] == 14
     assert len(captured["lighthouse_paths"]) == 1
     assert captured["lighthouse_paths"][0].endswith("one.json")

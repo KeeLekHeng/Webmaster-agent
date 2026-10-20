@@ -8,7 +8,7 @@ from langgraph.graph import END, START, StateGraph
 from langsmith import tracing_context
 
 from .audit import audit, now, save_report
-from .investigation import ClaudeInvestigator, DemoInvestigator, filter_investigation, project_evidence
+from .investigation import ClaudeInvestigator, DemoInvestigator, filter_investigation, project_evidence, investigation_failure_notice
 from .models import AnalysisResult, Investigation, Report, SiteConfig
 from .network import enabled, validate_url
 from .summary import build_summary
@@ -109,9 +109,9 @@ def build_graph(collector=audit, investigator=None):
                 candidate = Investigation.model_validate(client(state["payload"]))
                 report.analysis.usage = getattr(client, "usage", {})
                 report.analysis.status = "demo" if mode == "demo" else "complete"
-            except Exception:
+            except Exception as exc:
                 report.analysis.status = "unavailable"
-                report.analysis.notices.append("Investigation unavailable; check local model configuration, API access or response validity. Raw errors are not stored.")
+                report.analysis.notices.append(investigation_failure_notice(exc))
         event(report, "investigate_findings", report.analysis.status)
         return {"candidate": candidate, "report": report}
 

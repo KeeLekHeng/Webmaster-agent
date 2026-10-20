@@ -125,9 +125,9 @@ def default_end():
     return today - timedelta(days=3)
 
 
-def collect_search(site_id, config, property_name, days=7, end=None, query=None):
-    if days not in (7, 28):
-        raise ValueError("Supported periods are 7 or 28 days")
+def collect_search(site_id, config, property_name, days=14, end=None, query=None):
+    if days not in (7, 14, 28):
+        raise ValueError("Supported periods are 7, 14 or 28 days")
     end = end or default_end()
     start = end - timedelta(days=days - 1)
     previous_end = start - timedelta(days=1)

@@ -25,7 +25,7 @@ def main():
     review.add_argument("--config", default=os.getenv("GUARDIAN_CONFIG", "config/sites.json"))
     review.add_argument("--output", default=os.getenv("GUARDIAN_OUTPUT", "reports"))
     review.add_argument("--property", dest="property_name", default=os.getenv("GUARDIAN_GSC_PROPERTY"))
-    review.add_argument("--days", type=int, choices=[7, 28], default=7)
+    review.add_argument("--days", type=int, choices=[7, 14, 28], default=14)
     review.add_argument("--end-date", help="Last current-period date, YYYY-MM-DD in Pacific time")
     review.add_argument("--input-search", help="Import normalized search-periods.json instead of calling Google")
     review.add_argument("--performance-sample", action="append", default=[], help="Repeat for each Lighthouse lab sample")

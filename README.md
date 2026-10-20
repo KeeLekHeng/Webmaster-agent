@@ -214,7 +214,7 @@ and Lighthouse/PageSpeed JSON import (`--lighthouse-report path/to/report.json`)
 Imported lab results preserve measurement dates and disable live history/alerts.
 Manual period reviews and PageSpeed collection are now implemented; Google account/API
 authorization and actual historical measurements remain pending. Owner-selected
-reporting default is seven days versus the previous seven days.
+reporting default is 14 days versus the previous 14 days (7 and 28 remain optional).
 See [Milestone 5 outcomes and commands](docs/MILESTONE_5.md).
 
 ```powershell

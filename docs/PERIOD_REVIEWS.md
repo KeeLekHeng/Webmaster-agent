@@ -4,7 +4,7 @@ Added 2026-10-19 to extend Milestone 5 beyond static technical checks.
 
 ## Owner outcome
 
-`guardian review` compares adjacent equal 7- or 28-day windows and saves:
+`guardian review` compares adjacent equal 7-, 14- or 28-day windows and saves:
 
 - Property clicks, impressions, CTR and average position, with absolute changes.
 - Comparable page-level changes, supporting evidence and prioritized next actions.
@@ -12,7 +12,9 @@ Added 2026-10-19 to extend Milestone 5 beyond static technical checks.
 - Comparable Lighthouse lab sample counts/medians, kept separate from visitor data.
 - Missing coverage and next data needed, rather than invented figures.
 
-Owner-selected default is 7 days versus the previous 7 days; 28 days is optional.
+Owner-selected default is now 14 days versus the previous 14 days; 7 and 28 are optional.
+This requires 28 days of history in total. For a newly launched site, confirm both
+windows fall after launch; a 28-day comparison would require 56 days in total.
 Dates use Google's Pacific calendar; end defaults to three days
 before today there. On Windows without timezone data, UTC minus four days gives a
 conservative cutoff without installing packages. `--end-date YYYY-MM-DD` overrides
@@ -77,6 +79,17 @@ can be wrong; valid IDs do not prove semantic correctness or causation. There is
 model call when no action candidates exist. Deterministic actions survive model
 failure. This is not an open-ended competitor/content research agent.
 
+Claude transient failures get at most three retries after the initial request,
+with exact backoff delays of 2, 4 and 8 seconds (four attempts maximum). Retryable:
+connection errors/timeouts and HTTP 408/409/429/5xx. Authentication, authorization,
+invalid request/model and response validation/refusal errors fail immediately.
+SDK automatic retries remain disabled, so retry loops cannot multiply. Each request
+keeps its 30-second timeout, and backoff checks the kill switch every 250 ms.
+Successful analysis usage records `request_attempts`; API token usage is that of
+the successful response, not a reconstructed total for failed requests. Exhaustion
+retains deterministic actions and a sanitized diagnostic. Google API collection
+does not inherit this Claude-only retry policy.
+
 Transparent triage defaults (not statistical significance):
 
 - Click loss: previous clicks at least 20, loss at least 10 and at least 20%.
@@ -86,6 +99,14 @@ Transparent triage defaults (not statistical significance):
   and CTR at most 2%. Query mix must be reviewed before assuming an opportunity.
 - Lab-score action: same URL/device/version-major/profile, at least three distinct
   measurement timestamps per window, median performance-score decline of at least 10.
+
+For a new/low-volume site, no threshold-triggered candidates no longer means no
+advice: when either property's period has fewer than 100 impressions and the
+current period has impressions, add a low-confidence informational search-mix
+review and up to three current-page review opportunities by impression count.
+These are investigation tasks, not confirmed regressions or content defects.
+Missing prior page observations remain unknown. Claude can explain the evidence
+and propose next checks; it has not inspected actual queries or content.
 
 Candidates are bounded, ranked primarily by absolute click loss, and retain exact
 evidence. Each action includes owner investigation/experiment and what to recheck.
