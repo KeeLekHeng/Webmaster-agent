@@ -20,6 +20,7 @@ def main():
     commands.add_parser("explain", help="Explain the LangGraph workflow without network access")
     commands.add_parser("stop", help="Create the persistent local kill switch")
     commands.add_parser("resume", help="Remove the persistent local kill switch")
+    commands.add_parser("gsc-auth-check", help="Test configured Google token refresh without querying search data")
     review = commands.add_parser("review", help="Compare search visibility and lab speed across equal periods")
     review.add_argument("--site", required=True)
     review.add_argument("--config", default=os.getenv("GUARDIAN_CONFIG", "config/sites.json"))
@@ -93,6 +94,13 @@ def main():
         return 0
     try:
         enabled()
+        if args.command == "gsc-auth-check":
+            from .google_auth import search_console_access, AUTH_NOTICES
+            access = search_console_access()
+            print(f"Google authorization: {access.status}. {AUTH_NOTICES[access.status]}")
+            if access.status == "manual-token":
+                print("Manual token presence is not a validation of Google access. Persistent refresh is not configured.")
+            return 0 if access.status == "refreshed" else 1
         if args.command in ("review", "performance-sample"):
             from datetime import date
             import re

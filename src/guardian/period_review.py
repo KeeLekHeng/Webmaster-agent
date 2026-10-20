@@ -60,8 +60,8 @@ def compare(snapshot, config, lighthouse_paths=()):
                     tools={"period_review": "guardian-period/1"}, limitations=list(LIMITS))
     if snapshot.source in ("owner-import", "synthetic-demo"):
         report.limitations.append("Imported input: owner-declared provenance/authenticity is unverified. Synthetic data is a demonstration only." if snapshot.source == "owner-import" else "SYNTHETIC DEMO: all search metrics are fictional; no live-site conclusion is supported.")
-    if snapshot.source == "not-connected":
-        report.limitations.append("Search Console is not connected: no GUARDIAN_GSC_ACCESS_TOKEN was provided; no Google search request was made.")
+    from .google_auth import AUTH_NOTICES
+    report.limitations.append(AUTH_NOTICES[snapshot.authorization])
     safe_evidence = []
 
     def record(source, check, outcome, details, timestamp=None):
@@ -260,6 +260,7 @@ def run_review(state, progress=print, collector=collect_search, investigator=Non
             snapshot = SearchSnapshot.model_validate_json(path.read_bytes())
             if snapshot.source == "google-api":
                 snapshot.source = "owner-import"  # Never trust an imported provenance label.
+            snapshot.authorization = "unknown"  # Importing does not refresh or verify credentials.
         else:
             snapshot = collector(s["site_id"], s["config"], s["property_name"], s.get("days", 14), s.get("end"))
         return {"snapshot": validate_snapshot(snapshot, s["site_id"], s["config"])}

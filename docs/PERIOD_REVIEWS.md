@@ -21,10 +21,10 @@ conservative cutoff without installing packages. `--end-date YYYY-MM-DD` overrid
 the cutoff. Only finalized API data is requested; this does not guarantee the latest
 requested date has data. Equal windows help weekday comparison, not seasonality.
 
-## Search Console access (still needed for the real site)
+## Search Console access
 
 The owner confirmed on 2026-10-19 that they can open the verified property and its
-Performance report. Guardian still needs separate read-only API authorization.
+Performance report. The manual-token connection was verified on 2026-10-20.
 The owner can access the property in the Performance
 report in [Google Search Console](https://search.google.com/search-console).
 An Anthropic key, GitHub token or Google API key does not grant Search Console access.
@@ -43,8 +43,10 @@ GUARDIAN_GSC_ACCESS_TOKEN=
 Use the exact verified property: the domain example above, or the configured base
 URL-prefix `https://estateplanning.com.my/`. The authenticated API determines whether
 the account has access; Guardian checks the property against its site configuration
-first. Tokens are short-lived; automatic OAuth refresh is not implemented. Do not
-enable unattended operation until token lifecycle is implemented and authorized.
+first. Manual tokens are short-lived. Persistent refresh is now implemented with
+three additional environment variables; see [Google refresh setup](GOOGLE_AUTH_SETUP.md).
+The owner supplied their own OAuth client and refresh grant; live refresh and a
+Claude-assisted review succeeded on 2026-10-20. Scheduling remains disabled.
 
 ```powershell
 .venv\Scripts\guardian.exe review --site estateplanning --days 28 --llm claude
@@ -167,7 +169,9 @@ rankings/search metrics remain unavailable. One explicit mobile PageSpeed attemp
 returned unavailable; no performance score or sample was fabricated or saved.
 The offline demo and mocked Google/Claude tests validate behavior, not current-site
 search performance. Owner confirmed Search Console availability and selected
-seven-day comparisons; API authorization remains pending.
+14-day comparisons. Live token refresh, actual search-data retrieval and Claude
+interpretation succeeded on 2026-10-20; saved report:
+`reports/5b3ef963d07e4e46bb175cc1f04e6f21`. Speed history remains unavailable.
 
 References: [Search Analytics API, dates/aggregation/limits](https://developers.google.com/webmaster-tools/v1/searchanalytics/query),
 [Google authorization](https://developers.google.com/webmaster-tools/v1/how-tos/authorizing),

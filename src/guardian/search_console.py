@@ -1,6 +1,5 @@
 """Read-only aggregate Search Console collection; no search-query/customer text."""
 import json
-import os
 import time
 from datetime import date, datetime, timedelta, timezone
 from urllib.parse import quote
@@ -62,6 +61,7 @@ class SearchSnapshot(BaseModel):
     source: str = Field(pattern="^(google-api|owner-import|synthetic-demo|not-connected)$")
     search_type: str = Field(default="web", pattern="^web$")
     data_state: str = Field(default="final", pattern="^final$")
+    authorization: str = Field(default="unknown", pattern="^(unknown|manual-token|not-connected|refreshed|refresh-config-incomplete|refresh-config-invalid|reauthorization-required|refresh-scope-rejected|refresh-failed)$")
     scope: str = Field(default="all countries/devices; no query filters", pattern="^all countries/devices; no query filters$")
     previous: SearchWindow
     current: SearchWindow
@@ -137,11 +137,14 @@ def collect_search(site_id, config, property_name, days=14, end=None, query=None
         previous=SearchWindow(start=previous_start, end=previous_end, status="unavailable"),
         current=SearchWindow(start=start, end=end, status="unavailable"))
     validate_snapshot(snapshot, site_id, config)
-    token = os.getenv("GUARDIAN_GSC_ACCESS_TOKEN")
     if query is None:
-        if not token:
+        from .google_auth import search_console_access
+        access = search_console_access()
+        snapshot.authorization = access.status
+        if not access.token:
             snapshot.source = "not-connected"
             return snapshot
+        token = access.token
         endpoint = "https://www.googleapis.com/webmasters/v3/sites/" + quote(property_name, safe="") + "/searchAnalytics/query"
         def query(body):
             return google_json("POST", endpoint, headers={"Authorization": "Bearer " + token}, body=body)

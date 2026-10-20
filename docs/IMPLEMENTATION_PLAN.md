@@ -130,3 +130,13 @@ Guardian OAuth authorization is not configured. One PageSpeed attempt was unavai
 no live score was saved. Analytics, query-level ranking data, automatic OAuth refresh
 and scheduled collection remain pending. See `PERIOD_REVIEWS.md` for acceptance,
 commands, thresholds and actual data limitations. Real business outcomes are not yet validated.
+
+Update 2026-10-20: owner selected 14-day comparisons; actual Search Console reads
+with the manual token are verified. Low-volume review actions and Claude retries
+are implemented. Persistent read-only Google refresh is implemented locally and
+mock-tested, with safe authorization diagnostics and a manual `gsc-auth-check`.
+Owner supplied the OAuth client/refresh grant and enabled Search Console API.
+Live token renewal, search reads and a Claude-assisted 14-day review succeeded
+on 2026-10-20. No credentials or consent grants were created by the agent.
+See `GOOGLE_AUTH_SETUP.md`. Scheduling,
+VPS deployment and external notifications remain disabled.

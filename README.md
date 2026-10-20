@@ -212,8 +212,9 @@ deletion is enabled.
 Milestone 5 adds optional public SEO checks (`guardian audit --site estateplanning --seo`)
 and Lighthouse/PageSpeed JSON import (`--lighthouse-report path/to/report.json`).
 Imported lab results preserve measurement dates and disable live history/alerts.
-Manual period reviews and PageSpeed collection are now implemented; Google account/API
-authorization and actual historical measurements remain pending. Owner-selected
+Manual period reviews and PageSpeed collection are now implemented; manual-token
+Search Console access and automatic read-only token refresh were verified on
+2026-10-20. Speed history remains pending. Owner-selected
 reporting default is 14 days versus the previous 14 days (7 and 28 remain optional).
 See [Milestone 5 outcomes and commands](docs/MILESTONE_5.md).
 
@@ -225,5 +226,8 @@ guardian performance-sample --site estateplanning --url https://estateplanning.c
 Reviews compare search clicks, impressions, CTR and average position, then provide
 evidence-backed investigation/improvement actions with optional Claude reasoning.
 See [period reviews and Google access](docs/PERIOD_REVIEWS.md). Search Console access
-in the owner's browser is confirmed; Guardian's read-only OAuth connection is not
-configured yet. Synthetic examples are explicitly labeled and are not live results.
+and the read-only manual-token connection are confirmed. Persistent refresh is now
+implemented; [configure your own OAuth client and refresh token](docs/GOOGLE_AUTH_SETUP.md),
+then run `guardian gsc-auth-check`. Live refresh and a Claude-assisted 14-day
+review completed successfully on 2026-10-20.
+Synthetic examples are explicitly labeled and are not live results.
