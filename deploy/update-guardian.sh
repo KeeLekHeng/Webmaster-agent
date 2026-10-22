@@ -25,6 +25,24 @@ weekly_state=$(systemctl show guardian-weekly.service -p ActiveState --value)
 [[ "$weekly_state" = inactive || "$weekly_state" = failed ]] || { echo 'Weekly work started; timer stays stopped, inspect before retry'; exit 1; }
 systemctl stop guardian-listener.service
 trap 'echo "Update interrupted. Preserve state; inspect stopped Guardian units. Backup: $backup"' ERR
+# SIGTERM can leave the durable polling lease until expiry. Never erase it or
+# restart repeatedly into systemd's start limit; wait before starting the new bot.
+python3 - <<'PY'
+import pathlib, sqlite3, time
+from contextlib import closing
+path = pathlib.Path('/var/lib/guardian/work/data/telegram.sqlite3')
+deadline = time.monotonic() + 130
+if path.exists():
+    while True:
+        with closing(sqlite3.connect(path.as_uri()+'?mode=ro',uri=True)) as db:
+            expiry = db.execute('SELECT max(expires_at) FROM telegram_leases').fetchone()[0] or 0
+        if expiry <= time.time():
+            break
+        if time.monotonic() >= deadline:
+            raise RuntimeError('Polling lease did not expire; preserve state and inspect')
+        print('Waiting for the previous polling lease to expire...', flush=True)
+        time.sleep(min(10, expiry-time.time()))
+PY
 site=/opt/guardian/app/.venv/lib/python3.12/site-packages
 test -d "$site/guardian"
 cp -a "$site/guardian" "$backup/guardian"
