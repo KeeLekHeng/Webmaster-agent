@@ -8,6 +8,8 @@ expected=${1:?Supply the reviewed wheel SHA256}
 wheel=website_guardian-0.1.0-py3-none-any.whl
 printf '%s  %s\n' "$expected" "$wheel" | sha256sum --check -
 test ! -L "$wheel"
+test -f ./repair-smoke.sh
+test ! -L ./repair-smoke.sh
 test -f /opt/guardian/cutover-receipt.json
 test ! -e /var/lib/guardian/work/data/STOP
 systemctl is-active --quiet sisweb.service
@@ -63,9 +65,7 @@ systemd-run --wait --pipe --collect --unit=guardian-code-update \
     /opt/guardian/app/.venv/bin/python -m pip install --no-index --no-deps \
     --force-reinstall "$backup/$wheel"
 # Reuse the installed isolation and preserved-execution proof.
-systemctl restart guardian-smoke.service
-test "$(systemctl show guardian-smoke.service -p ExecMainStartTimestampMonotonic --value)" -gt 0
-test "$(systemctl show guardian-smoke.service -p Result --value)" = success
+bash ./repair-smoke.sh --verify-only
 systemctl start guardian-listener.service
 systemctl start guardian-weekly.timer
 sleep 5

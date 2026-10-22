@@ -29,6 +29,16 @@ retention/menu update is staged at `/home/deploy/guardian-update-20261023`; inst
 is pending owner execution. Telegram command-menu registration is already live;
 the richer `/help` response and retention CLI require the package update.
 
+Update smoke regression: after cutover, the smoke unit inherited the live
+`EnvironmentFile` and failed its disabled/no-credentials assertions. The package
+installation had completed, but the updater correctly left polling/scheduling
+stopped. [repair-smoke.sh](../deploy/repair-smoke.sh) clears the environment-file
+list for **smoke only**, explicitly disables activity and unsets credential keys.
+It retains the filesystem, resource and seccomp checks. `--verify-only` checks
+without starting background work; owner-run `--resume` also verifies no active
+polling lease before starting the listener/timer. The updater now calls this
+helper. No live environment file or API credential is changed by the repair.
+
 ### Files to preserve
 
 Keep `deploy/`, its tests, dependency locks, configuration templates and this guide
