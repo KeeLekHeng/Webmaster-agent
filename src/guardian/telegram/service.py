@@ -10,6 +10,7 @@ from guardian.core.network import enabled
 from guardian.telegram.reporting import clean, load_report, render, saved_date
 from guardian.telegram.state import TelegramStore, digest
 from guardian.telegram.transport import TelegramSettings, TelegramError, call
+from guardian.telegram.transport import wait
 
 
 class OwnerBot:
@@ -147,11 +148,22 @@ class OwnerBot:
             webhook = self.api("getWebhookInfo")
             if not isinstance(webhook, dict) or webhook.get("url"):
                 raise ValueError("Webhook exists; stop without changing Telegram settings")
+            failures = 0
             while True:
                 self.guard()
                 self.store.renew(self.bot_id, owner)
-                updates = self.api("getUpdates", {"offset": self.store.offset(self.bot_id), "timeout": 5,
-                                                  "limit": 100, "allowed_updates": ["message"]})
+                try:
+                    updates = self.api("getUpdates", {"offset": self.store.offset(self.bot_id), "timeout": 5,
+                                                      "limit": 100, "allowed_updates": ["message"]})
+                    failures = 0
+                except TelegramError as exc:
+                    if exc.outcome not in {"unavailable", "rate-limited"} or failures >= 3:
+                        raise
+                    if progress:
+                        progress("Telegram read-only poll unavailable; retrying without resending messages.")
+                    wait(2 ** (failures + 1))
+                    failures += 1
+                    continue
                 if not isinstance(updates, list) or len(updates) > 100:
                     raise ValueError("Invalid Telegram update batch")
                 for update in updates:

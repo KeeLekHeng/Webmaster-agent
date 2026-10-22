@@ -91,6 +91,55 @@ def test_uncertain_send_never_blindly_retried(env, tmp_path, config, saved):
     assert bot.store.receipts() == [{"outcome": "uncertain", "count": 1}]
 
 
+def test_owner_reconciliation_authorizes_exact_retry_once(env,tmp_path,config,saved):
+    bot,api = owner(tmp_path,config,saved)
+    api.fail = True
+    with pytest.raises(TelegramError): bot.report("run1")
+    row = bot.store.delivery_details(bot.destination)[0]
+    with pytest.raises(ValueError): bot.store.reconcile(row["key"],"wrong destination","retry")
+    assert bot.store.reconcile(row["key"],bot.destination,"retry") == "retry-authorized"
+    api.fail = False
+    assert bot.report("run1") == "sent"
+    assert bot.report("run1") == "duplicate-suppressed"
+    with bot.store.connect() as db:
+        assert db.execute("SELECT previous_outcome,decision FROM telegram_reconciliations").fetchone() == ("uncertain","retry")
+
+
+def test_owner_confirmed_receipt_and_inflight_protection(env,tmp_path,config,saved):
+    bot,api = owner(tmp_path,config,saved)
+    api.fail = True
+    with pytest.raises(TelegramError): bot.report("run1")
+    key = bot.store.delivery_details()[0]["key"]
+    assert bot.store.reconcile(key,bot.destination,"received") == "owner-confirmed"
+    assert bot.report("run1") == "duplicate-suppressed"
+    key2 = "a"*64
+    bot.store.claim_delivery(key2,bot.destination)
+    with pytest.raises(ValueError): bot.store.reconcile(key2,bot.destination,"retry")
+
+
+def test_sender_can_deliver_while_polling_lease_exists(env,tmp_path,config,saved):
+    bot,api = owner(tmp_path,config,saved)
+    with bot.store.lease(bot.bot_id):
+        assert bot.report("run1") == "sent"
+
+
+def test_transient_poll_retry_does_not_resend(env,tmp_path,config,saved,monkeypatch):
+    bot,api=owner(tmp_path,config,saved)
+    original=bot.api
+    attempts=[]
+    waits=[]
+    monkeypatch.setattr('guardian.telegram.service.wait',waits.append)
+    def flaky(method,data=None,document=None):
+        if method=='getUpdates':
+            attempts.append(method)
+            if len(attempts)<4: raise TelegramError('unavailable')
+        return original(method,data,document)
+    bot.api=flaky
+    bot.listen(once=True,progress=None)
+    assert waits==[2,4,8] and len(attempts)==4
+    assert not any(c[0].startswith('send') for c in api.calls)
+
+
 def test_bot_or_chat_change_fails_enrollment(env, tmp_path, config, saved, monkeypatch):
     bot, api = owner(tmp_path, config, saved)
     monkeypatch.setenv("GUARDIAN_TELEGRAM_CHAT_ID", "999")

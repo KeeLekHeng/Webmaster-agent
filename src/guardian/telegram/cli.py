@@ -8,7 +8,7 @@ from guardian.telegram.reporting import load_report, render
 from guardian.telegram.service import OwnerBot
 from guardian.telegram.state import TelegramStore
 
-COMMANDS = {"telegram-send", "telegram-listen", "telegram-status"}
+COMMANDS = {"telegram-send", "telegram-listen", "telegram-status", "telegram-reconcile"}
 
 
 def register(commands):
@@ -18,6 +18,11 @@ def register(commands):
         parser.add_argument("--config", default=os.getenv("GUARDIAN_CONFIG", "config/sites.json"))
         parser.add_argument("--reports", default=os.getenv("GUARDIAN_OUTPUT", "reports"))
         parser.add_argument("--state", default="data/telegram.sqlite3")
+        if name == "telegram-status":
+            parser.add_argument("--details", action="store_true", help="Show the last 20 safe receipt identifiers")
+        if name == "telegram-reconcile":
+            parser.add_argument("--key", required=True)
+            parser.add_argument("--decision", required=True, choices=["received", "retry"])
         if name == "telegram-send":
             parser.add_argument("--run-id")
             parser.add_argument("--preview", action="store_true", help="Render locally without Telegram access")
@@ -32,6 +37,7 @@ def run(args):
     if args.command == "telegram-status":
         print(json.dumps({"enabled": os.getenv("GUARDIAN_TELEGRAM_ENABLED", "false").lower() == "true",
                           "receipts": TelegramStore(args.state).receipts(),
+                          "recent": TelegramStore(args.state).delivery_details() if args.details else [],
                           "scheduled_by_this_command": False}))
         return 0
     if args.command == "telegram-send" and args.preview:
@@ -41,6 +47,9 @@ def run(args):
         print(f"Attachment: guardian-report.md ({len(document)} bytes). Preview only; no message sent.")
         return 0
     bot = OwnerBot(args.site, config, args.reports, args.state)
+    if args.command == "telegram-reconcile":
+        print("Reconciliation: " + bot.store.reconcile(args.key,bot.destination,args.decision) + ". No message sent.")
+        return 0
     if args.command == "telegram-listen":
         print("Telegram listener starting for the enrolled private owner. Press Ctrl+C to stop; no schedule installed.", flush=True)
         try:
@@ -48,7 +57,7 @@ def run(args):
         except KeyboardInterrupt:
             print("Telegram listener stopped; lease released.", flush=True)
     else:
-        with bot.store.lease(bot.bot_id):
-            outcome = bot.report(args.run_id, important_only=args.important_only)
+        # Only update consumers need the polling lease. Delivery has atomic receipts.
+        outcome = bot.report(args.run_id, important_only=args.important_only)
         print(f"Telegram delivery: {outcome}")
     return 0

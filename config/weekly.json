@@ -1,0 +1,8 @@
+{
+  "enabled": false,
+  "site_id": "estateplanning",
+  "llm": "claude",
+  "send_telegram": true,
+  "collect_speed": true,
+  "days": 14
+}

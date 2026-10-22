@@ -30,7 +30,7 @@
 ## 5. Integration and owner handoff
 
 - [x] 5.1 Run full pytest and strict OpenSpec validation; record actual results and unresolved limitations without fabricated live sends.
-- [ ] 5.2 After owner pairing and enablement, send one approved live summary/attachment and exercise `/status` and `/report`; verify the correct private destination and persist redacted receipts, or explicitly record the owner-dependent live-test blocker.
+- [x] 5.2 After owner pairing and enablement, send one approved live summary/attachment and exercise `/status` and `/report`; verify the correct private destination and persist redacted receipts, or explicitly record the owner-dependent live-test blocker.
 - [x] 5.3 Demonstrate duplicate suppression and listener shutdown in integration checks; confirm no scheduled job, merge/deployment route or public endpoint was enabled.
 
 ## Workflow follow-up
@@ -43,6 +43,6 @@
 - Full suite: 255 passed, 1 skipped before two additional focused tests; final counts are recorded at handoff.
 - Strict OpenSpec validation passed.
 - Actual saved review summary/document delivered once to the enrolled private owner; repeated manual send was suppressed.
-- Owner-generated live /status and /report checks remain pending. Mocked command, authorization, rate-limit, offset/restart and stop-during-poll checks pass.
+- Owner confirmed live /status previously and /report on 2026-10-22 after restarting a failed listener. Saved private-owner send receipts and duplicate suppression were verified. Poll recovery/supervision is tracked in weekly-owner-insights.
 - The real-symlink test is skipped on this Windows session because link creation requires extra privileges.
-- New code is grouped in guardian/telegram; broader Python organization is tracked in docs/TODO.md.
+- New code is grouped in guardian/telegram; broader Python organization is tracked in docs/TECHNICAL_GUIDE.md.

@@ -2,6 +2,8 @@
 import hashlib
 import sqlite3
 import time
+import re
+import getpass
 
 from guardian.core.network import enabled
 from guardian.telegram.pairing import PairingStore
@@ -16,6 +18,10 @@ class TelegramStore(PairingStore):
         super().__init__(path)
         with self.connect() as db:
             db.executescript("""
+                CREATE TABLE IF NOT EXISTS telegram_reconciliations (
+                    id INTEGER PRIMARY KEY, delivery_key TEXT NOT NULL,
+                    decided_at REAL NOT NULL, actor TEXT NOT NULL,
+                    previous_outcome TEXT NOT NULL, decision TEXT NOT NULL);
                 CREATE TABLE IF NOT EXISTS telegram_receipts (
                     delivery_key TEXT PRIMARY KEY, destination TEXT NOT NULL,
                     created_at REAL NOT NULL, updated_at REAL NOT NULL,
@@ -55,7 +61,8 @@ class TelegramStore(PairingStore):
             try:
                 db.execute("INSERT INTO telegram_receipts VALUES (?,?,?,?,?,NULL)", (key, destination, now, now, "pending"))
             except sqlite3.IntegrityError:
-                return False
+                return db.execute("UPDATE telegram_receipts SET outcome='pending',updated_at=? WHERE delivery_key=? AND destination=? AND outcome='retry-authorized'",
+                                  (now, key, destination)).rowcount == 1
         return True
 
     def finish_delivery(self, key, outcome, message_id=None):
@@ -100,3 +107,26 @@ class TelegramStore(PairingStore):
     def receipts(self):
         with self.connect() as db:
             return [dict(zip(("outcome", "count"), row)) for row in db.execute("SELECT outcome,count(*) FROM telegram_receipts GROUP BY outcome")]
+
+    def delivery_details(self, destination=None, limit=20):
+        with self.connect() as db:
+            rows = db.execute("SELECT delivery_key,created_at,updated_at,outcome,message_id FROM telegram_receipts WHERE (? IS NULL OR destination=?) ORDER BY created_at DESC LIMIT ?",
+                              (destination, destination, limit)).fetchall()
+        return [dict(zip(("key", "created_at", "updated_at", "outcome", "message_id"), row)) for row in rows]
+
+    def reconcile(self, key, destination, decision):
+        enabled()
+        if not re.fullmatch(r"[a-f0-9]{64}", key) or decision not in {"received", "retry"}:
+            raise ValueError("Invalid reconciliation decision")
+        with self.connect() as db:
+            db.execute("BEGIN IMMEDIATE")
+            row = db.execute("SELECT outcome,updated_at FROM telegram_receipts WHERE delivery_key=? AND destination=?", (key,destination)).fetchone()
+            if not row or row[0] in {"sent", "owner-confirmed", "retry-authorized"}:
+                raise ValueError("Receipt is absent or already resolved")
+            if row[0] == "pending" and time.time() - row[1] < 120:
+                raise ValueError("Delivery may still be in flight; wait before reconciling")
+            outcome = "owner-confirmed" if decision == "received" else "retry-authorized"
+            db.execute("INSERT INTO telegram_reconciliations(delivery_key,decided_at,actor,previous_outcome,decision) VALUES(?,?,?,?,?)",
+                       (key,time.time(),getpass.getuser(),row[0],decision))
+            db.execute("UPDATE telegram_receipts SET outcome=?,updated_at=? WHERE delivery_key=?", (outcome,time.time(),key))
+        return outcome

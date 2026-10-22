@@ -26,6 +26,9 @@ def main():
     commands.add_parser("stop", help="Create the persistent local kill switch")
     commands.add_parser("resume", help="Remove the persistent local kill switch")
     commands.add_parser("gsc-auth-check", help="Test configured Google token refresh without querying search data")
+    weekly = commands.add_parser("weekly-digest", help="Run one authorized weekly collection/delivery slot")
+    weekly.add_argument("--schedule-config", default="config/weekly.json")
+    weekly.add_argument("--preview", action="store_true", help="Show schedule without collection or delivery")
     pair = commands.add_parser("telegram-pair", help="Verify a private owner chat; does not enable delivery")
     pairing_mode = pair.add_mutually_exclusive_group()
     pairing_mode.add_argument("--check", action="store_true", help="Find the matching private-chat challenge")
@@ -43,6 +46,7 @@ def main():
     review.add_argument("--performance-dir", help="Default: data/performance/<site>; used when no explicit samples supplied")
     review.add_argument("--llm", choices=["none", "demo", "claude"], default="none")
     review.add_argument("--model", default=os.getenv("GUARDIAN_MODEL"))
+    review.add_argument("--no-queries", action="store_true", help="Skip bounded query/page samples")
     speed = commands.add_parser("performance-sample", help="Run one explicit public PageSpeed lab measurement")
     speed.add_argument("--site", required=True)
     speed.add_argument("--config", default=os.getenv("GUARDIAN_CONFIG", "config/sites.json"))
@@ -104,6 +108,16 @@ def main():
         return 0
     try:
         enabled()
+        if args.command == "weekly-digest":
+            from guardian.scheduling.weekly import WeeklyConfig, run_weekly
+            schedule = WeeklyConfig.model_validate_json(Path(args.schedule_config).read_bytes())
+            if args.preview:
+                print(schedule.model_dump_json(indent=2))
+                print("Monday 09:00 Asia/Kuala_Lumpur. Preview only; no collection or delivery.")
+                return 0
+            result = run_weekly(schedule)
+            print(json.dumps(result))
+            return 1 if result["status"] in {"partial", "interrupted"} else 0
         if args.command in TELEGRAM_COMMANDS:
             from guardian.telegram.cli import run as run_telegram
             return run_telegram(args)
@@ -149,7 +163,7 @@ def main():
                                  "property_name": args.property_name or config.base_url.rstrip("/") + "/",
                                  "days": args.days, "end": date.fromisoformat(args.end_date) if args.end_date else None,
                                  "input_path": args.input_search, "lighthouse_paths": samples,
-                                 "mode": args.llm, "model": args.model})
+                                 "mode": args.llm, "model": args.model, "include_queries": not args.no_queries})
             print(result["report"].summary)
             print(f"Saved review: {Path(result['directory']) / 'summary.md'}")
             return 1 if result["report"].status == "partial" or result["report"].analysis.status in ("unavailable", "partial", "rejected") else 0

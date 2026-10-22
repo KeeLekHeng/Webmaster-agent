@@ -23,13 +23,19 @@ LIMITS = [
     "Search Console web search, all countries/devices, finalized data only; dates use Pacific time. Recent data can lag.",
     "Average position is an impression-weighted search metric, not a fixed keyword rank. A mix of queries, devices or countries can change it.",
     "Page rows are a top-row sample, not exhaustive. Missing page rows are unknown, never zero traffic. Property totals are queried separately and are not page-row sums.",
-    "No search-query text, personal/customer data, analytics conversions or revenue is collected. Cause and business impact are unproven.",
+    "Optional query/page samples exclude obvious identifiers and credentials but cannot guarantee detection of all personal text. Query strings stay out of model inputs. No customer submissions, conversions or revenue are collected.",
+    "Query/page rows are sampled and anonymized queries can be absent. Missing rows are unknown, not zero. Query-row sums must not be compared with property totals; average position is not a fixed keyword rank.",
     "Lighthouse samples are dated lab observations, not a retrospective visitor-performance measurement. Missing historical samples cannot be reconstructed.",
     "Action thresholds are triage heuristics, not statistical significance. Seasonality and search-result changes are possible explanations, not verified causes.",
     "Review-only workflow: no website changes, PRs, deployments, external delivery or scheduling. Live audit issue history is untouched.",
 ]
 
 PERIOD_SYSTEM = SYSTEM + """
+Finding IDs, evidence IDs and Query Q labels are separate namespaces. F001 does
+not necessarily cite E001. For each finding copy exactly its evidence_ids array;
+never infer a citation from a numeric suffix. supporting_evidence binds the
+observations to that finding. Query strings are deliberately not provided, so
+do not infer keywords or intent from a Q label.
 This is a period review. Numeric deltas are calculated by Python, never recalculate
 or invent them. Explain the relationships between clicks, impressions, CTR and
 average position in each supplied finding. Positive position change means a higher
@@ -72,6 +78,27 @@ def compare(snapshot, config, lighthouse_paths=()):
     def action(title, eid, step, signal, observations, severity="medium", confidence="medium"):
         report.findings.append(Finding(title=title, severity=severity, confidence=confidence, evidence_ids=[eid], next_step=step))
         safe_evidence.append({"id": eid, "check": signal, "outcome": "finding", "observations": observations})
+
+    # Keep text out of the model; join numeric Q IDs to the owner-only evidence.
+    previous_queries = {(r.query, r.page): r for r in snapshot.previous.query_pages}
+    query_candidates = sorted(snapshot.current.query_pages, key=lambda r: (-r.metrics.impressions, r.page, r.query))[:10]
+    for index, row in enumerate(query_candidates, 1):
+        before = previous_queries.get((row.query, row.page)) if snapshot.previous.query_status == "available" else None
+        observations = changes(before.metrics, row.metrics) if before else {"current": row.metrics.model_dump(), "previous_observation_available": False}
+        observations["limited_volume"] = before is None or min(before.metrics.impressions, row.metrics.impressions) < 100
+        label = f"Query Q{index:03d}"
+        eid = record(row.page, "search_query_opportunity", "passed", {"label": label, "query": row.query, **observations})
+        if index <= 3:
+            decline = before is not None and before.metrics.clicks >= 20 and observations.get("clicks_change", 0) <= -10
+            step = (f'Review the page for the observed search phrase "{row.query}". ' +
+                    ("Clicks fell in the matched query/page sample; check indexing, search results and recent page changes before selecting a fix. " if decline else
+                     "Compare the title and opening content with this phrase and its search intent before proposing a human-reviewed experiment. ") +
+                    ("The previous row is missing, so a ranking or traffic change cannot be calculated. " if before is None else "") +
+                    "Recheck relevant clicks and CTR in the next 14-day comparison; improvement is not guaranteed.")
+            action(label + (": investigate fewer clicks" if decline else ": review keyword and page relevance"), eid, step,
+                   "query_page_review", observations, "medium" if decline else "info", "low" if observations["limited_volume"] else "medium")
+    if any(w.query_status == "unavailable" for w in (snapshot.previous, snapshot.current)):
+        report.limitations.append("Query/page collection unavailable for one or both periods; aggregate/page collection remains separate.")
 
     windows = {name: getattr(snapshot, name) for name in ("previous", "current")}
     for name, window in windows.items():
@@ -170,7 +197,8 @@ def compare(snapshot, config, lighthouse_paths=()):
     ids = {eid for f in report.findings[:20] for eid in f.evidence_ids}
     payload = {"untrusted_evidence": [e for e in safe_evidence if e["id"] in ids],
                "findings": [{"id": f"F{i+1:03d}", "severity": f.severity, "confidence": f.confidence,
-                             "evidence_ids": f.evidence_ids} for i, f in enumerate(report.findings[:20])],
+                             "evidence_ids": f.evidence_ids,
+                             "supporting_evidence": [e for e in safe_evidence if e["id"] in f.evidence_ids]} for i, f in enumerate(report.findings[:20])],
                "collection_partial": report.status != "complete"}
     if len(json.dumps(payload, allow_nan=False).encode()) > 32768:
         raise ValueError("Period investigation input budget exceeded")
@@ -236,6 +264,7 @@ class ReviewState(TypedDict, total=False):
     input_path: str | None
     lighthouse_paths: list[str]
     mode: str
+    include_queries: bool
     model: str | None
     output: str
     snapshot: SearchSnapshot
@@ -262,7 +291,8 @@ def run_review(state, progress=print, collector=collect_search, investigator=Non
                 snapshot.source = "owner-import"  # Never trust an imported provenance label.
             snapshot.authorization = "unknown"  # Importing does not refresh or verify credentials.
         else:
-            snapshot = collector(s["site_id"], s["config"], s["property_name"], s.get("days", 14), s.get("end"))
+            options = {"include_queries": True} if s.get("include_queries") else {}
+            snapshot = collector(s["site_id"], s["config"], s["property_name"], s.get("days", 14), s.get("end"), **options)
         return {"snapshot": validate_snapshot(snapshot, s["site_id"], s["config"])}
 
     def compare_period(s):

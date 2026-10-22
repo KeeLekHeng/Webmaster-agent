@@ -104,7 +104,11 @@ def short_caption(report):
         label = "Homepage" if path == "/" else path.strip("/").replace("-"," ").capitalize()
         label = clean(label,60)
         current = numbers(e.details.get("current"))
-        if e.check == "search_page_opportunity" and current.get("impressions",0) > 0:
+        if e.check == "search_query_opportunity":
+            label = clean(e.details.get("query", "Keyword"), 45)
+            action = f"Review keyword relevance on {path or '/'}; {current.get('impressions',0):g} impressions."
+            action = clean(action, 100)
+        elif e.check == "search_page_opportunity" and current.get("impressions",0) > 0:
             if current.get("clicks",0) > 0:
                 action = f"Review queries behind {current['clicks']:g} clicks."
             elif current.get("position",100) <= 5:
@@ -204,6 +208,8 @@ def render(report):
                      f"**Observed:** {saved_date(e.timestamp)}", ""]
         for key,value in observations.items():
             appendix.append(f"- **{plain(key.replace('_',' '))}:** {value}")
+        if e.check == "search_query_opportunity":
+            appendix.append("- **Observed search phrase:** " + plain(clean(e.details.get("query", ""),120)))
         for period,values in nested.items():
             appendix.append(f"- **{period.capitalize()}:** " + "; ".join(f"{k}: {v}" for k,v in values.items()))
         appendix.append("")

@@ -1,5 +1,7 @@
-"""Read-only aggregate Search Console collection; no search-query/customer text."""
+"""Read-only Search Console metrics with optional bounded query/page samples."""
 import json
+import re
+import os
 import time
 from datetime import date, datetime, timedelta, timezone
 from urllib.parse import quote
@@ -33,6 +35,24 @@ class Metrics(BaseModel):
         return self
 
 
+class QueryPage(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    query: str = Field(min_length=1, max_length=120)
+    page: str = Field(max_length=2000)
+    metrics: Metrics
+
+    @model_validator(mode="after")
+    def safe(self):
+        # Omit likely identifiers, instructions/control characters and credentials.
+        if (not all(c.isprintable() for c in self.query) or
+                re.search(r"@|https?://|sk-ant-|GOCSPX-|AIza|[<>]", self.query, re.I) or
+                len(re.sub(r"\D", "", self.query)) >= 7 or
+                any(len(value) >= 8 and value in self.query for key,value in os.environ.items()
+                    if re.search(r"TOKEN|SECRET|API_KEY|WRITE_KEY",key))):
+            raise ValueError("Query excluded by minimization policy")
+        return self
+
+
 class SearchWindow(BaseModel):
     model_config = ConfigDict(extra="forbid")
     start: date
@@ -40,6 +60,10 @@ class SearchWindow(BaseModel):
     totals: Metrics | None = None
     pages: dict[str, Metrics] = Field(default_factory=dict, max_length=1000)
     omitted_page_rows: int = Field(default=0, ge=0)
+    query_pages: list[QueryPage] = Field(default_factory=list, max_length=1000)
+    query_status: str = Field(default="not-requested", pattern="^(not-requested|available|empty|unavailable)$")
+    omitted_query_rows: int = Field(default=0, ge=0)
+    query_row_limit_reached: bool = False
     status: str = Field(pattern="^(available|empty|unavailable)$")
 
     @model_validator(mode="after")
@@ -48,8 +72,13 @@ class SearchWindow(BaseModel):
             raise ValueError("Invalid period")
         if self.status == "available" and self.totals is None:
             raise ValueError("Missing totals")
-        if self.status != "available" and (self.totals is not None or self.pages):
+        if self.status != "available" and (self.totals is not None or self.pages or self.query_pages):
             raise ValueError("Unavailable/empty data cannot carry metrics")
+        if self.query_status != "available" and self.query_pages:
+            raise ValueError("Query rows require available status")
+        keys = [(row.query, row.page) for row in self.query_pages]
+        if len(set(keys)) != len(keys):
+            raise ValueError("Duplicate query/page rows")
         return self
 
 
@@ -86,6 +115,8 @@ def validate_snapshot(snapshot, site_id, config):
     for window in (snapshot.previous, snapshot.current):
         for url in window.pages:
             validate_url(url, config)
+        for row in window.query_pages:
+            validate_url(row.page, config)
     return snapshot
 
 
@@ -125,7 +156,7 @@ def default_end():
     return today - timedelta(days=3)
 
 
-def collect_search(site_id, config, property_name, days=14, end=None, query=None):
+def collect_search(site_id, config, property_name, days=14, end=None, query=None, include_queries=False):
     if days not in (7, 14, 28):
         raise ValueError("Supported periods are 7, 14 or 28 days")
     end = end or default_end()
@@ -189,4 +220,32 @@ def collect_search(site_id, config, property_name, days=14, end=None, query=None
         except (ValueError, KeyError, TypeError, AttributeError, httpx.HTTPError):
             enabled()  # A stop request must propagate, not masquerade as API failure.
             continue
+        if include_queries and replacement.status == "available":
+            replacement.query_status = "unavailable"
+            try:
+                response = query({**base, "dimensions": ["query", "page"], "aggregationType": "byPage", "rowLimit": 1000})
+                rows = response.get("rows", [])
+                if response.get("responseAggregationType") != "byPage" or not isinstance(rows, list) or len(rows) > 1000:
+                    raise ValueError("Invalid query aggregation")
+                accepted, omitted, seen = [], 0, set()
+                for row in rows:
+                    try:
+                        if len(row["keys"]) != 2:
+                            raise ValueError("Invalid query dimensions")
+                        item = QueryPage(query=row["keys"][0], page=row["keys"][1],
+                                         metrics=Metrics.model_validate({k: row[k] for k in ("clicks", "impressions", "ctr", "position")}))
+                        validate_url(item.page, config)
+                        key = (item.query, item.page)
+                        if key in seen:
+                            raise ValueError("Duplicate query row")
+                        seen.add(key)
+                        accepted.append(item)
+                    except (ValueError, KeyError, TypeError):
+                        omitted += 1
+                replacement.query_pages = accepted
+                replacement.omitted_query_rows = omitted
+                replacement.query_status = "available" if accepted else "empty"
+                replacement.query_row_limit_reached = len(rows) == 1000
+            except (ValueError, KeyError, TypeError, AttributeError, httpx.HTTPError):
+                enabled()
     return snapshot

@@ -1,6 +1,6 @@
 # Codex Instructions — Website Guardian
 
-Read `docs/PROJECT_BLUEPRINT.md`, `docs/ARCHITECTURE_AND_SECURITY.md`, and `docs/IMPLEMENTATION_PLAN.md` before planning implementation. They describe intended behavior, not proven facts about the website or its infrastructure.
+Read `docs/TECHNICAL_GUIDE.md` before planning implementation. It consolidates architecture, security, setup, discovery, milestone outcomes and remaining work. Distinguish documented intent and historical observations from proven current website/infrastructure state. Update that guide rather than creating separate architecture, milestone or setup Markdown files; retain OpenSpec artifacts for its workflow.
 
 ## Mission
 Build **Website Guardian**, a separate Python/LangGraph-based website maintenance assistant. The first target is `https://estateplanning.com.my/`, whose source code is in a separate private GitHub repository. The user owns the website and has authorized planning and read-only assessment, **not production modification**.
@@ -19,7 +19,7 @@ Build **Website Guardian**, a separate Python/LangGraph-based website maintenanc
 
 ## First assignment: discovery only
 - Identify the actual stack, deployment pipeline, package manager, CI/CD, monitoring, tests, relevant integrations, and deployment topology by examining the Website Guardian repo and the **separately authorized** website repo. Do not assume SSH access implies permission to inspect production secrets or customer data.
-- Document confirmed findings with file paths, unknowns, risks and assumptions in `docs/DISCOVERY.md` (create this file).
+- Initial discovery is complete. Maintain confirmed findings with file paths, unknowns, risks and assumptions in the discovery section of `docs/TECHNICAL_GUIDE.md`.
 - Assess whether safe temporary same-host deployment is feasible, including isolation and resource budgets. If not, recommend a safer alternative.
 - Propose a small, testable V1 implementation plan based on findings; ask before installing dependencies, creating credentials, altering any production system, or enabling scheduled jobs.
 - Preserve user code and current deployments. Do not run intrusive scanners or send test form submissions without explicit approval.
