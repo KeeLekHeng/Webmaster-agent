@@ -3,8 +3,8 @@ import hashlib
 import sqlite3
 import time
 
-from ..network import enabled
-from ..telegram_pairing import PairingStore
+from guardian.core.network import enabled
+from guardian.telegram.pairing import PairingStore
 
 
 def digest(value):

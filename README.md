@@ -236,4 +236,4 @@ Telegram owner handoff now supports private pairing, manual summary/document sen
 durable deduplication and foreground read-only `/status` / `/report` polling. New
 code is grouped in `src/guardian/telegram`. It starts no service or schedule; normal
 audits/reviews do not send messages automatically. See [Telegram setup](docs/TELEGRAM_SETUP.md)
-and the [module organization follow-up](docs/TODO.md).
+and the [code structure guide](docs/CODE_STRUCTURE.md).

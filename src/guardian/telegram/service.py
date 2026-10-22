@@ -5,11 +5,11 @@ import time
 from html import escape
 from datetime import datetime, timezone, timedelta
 
-from ..history import issues
-from ..network import enabled
-from .reporting import clean, load_report, render, saved_date
-from .state import TelegramStore, digest
-from .transport import TelegramSettings, TelegramError, call
+from guardian.storage.history import issues
+from guardian.core.network import enabled
+from guardian.telegram.reporting import clean, load_report, render, saved_date
+from guardian.telegram.state import TelegramStore, digest
+from guardian.telegram.transport import TelegramSettings, TelegramError, call
 
 
 class OwnerBot:

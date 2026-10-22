@@ -3,10 +3,10 @@ import json
 import os
 from pathlib import Path
 
-from ..models import SiteConfig
-from .reporting import load_report, render
-from .service import OwnerBot
-from .state import TelegramStore
+from guardian.core.models import SiteConfig
+from guardian.telegram.reporting import load_report, render
+from guardian.telegram.service import OwnerBot
+from guardian.telegram.state import TelegramStore
 
 COMMANDS = {"telegram-send", "telegram-listen", "telegram-status"}
 

@@ -7,9 +7,9 @@ from html import escape
 from urllib.parse import urlsplit
 from pathlib import Path
 
-from ..models import Report
-from ..network import validate_url
-from ..summary import plain
+from guardian.core.models import Report
+from guardian.core.network import validate_url
+from guardian.reporting.summary import plain
 
 
 def clean(value, limit=2000):

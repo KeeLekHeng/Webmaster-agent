@@ -1,19 +1,20 @@
 # Follow-up work
 
-## Python module organization (owner requested 2026-10-21)
+## Python module organization (completed 2026-10-22)
 
-After Telegram implementation and verification, propose a small behavior-preserving
-reorganization. Keep the public `guardian` command and saved report/database formats
-compatible. Do not mix the move into feature debugging or silently change policy.
+Completed after Telegram implementation and verification. The public `guardian`
+command and saved report/database formats remain compatible. See
+[the package map](CODE_STRUCTURE.md). Telegram and restructuring have separate
+commits; the move introduces no policy changes.
 
-- Group deterministic audit/network/SEO/performance checks.
-- Group Google authorization and Search Console integrations.
-- Group report formatting and period-review reasoning/orchestration.
-- Group SQLite storage and scheduling interfaces.
-- Group repository proposals/approvals/publishing policy.
-- Keep Telegram's new code under its existing `guardian/telegram/` package.
-- Move incrementally, update imports and tests, retain compatibility wrappers where
-  needed, run the full suite, and document the resulting package map.
+- [x] Group deterministic audit/SEO/performance checks and shared network controls.
+- [x] Group Google authorization and Search Console integrations.
+- [x] Group report formatting and period-review reasoning/orchestration.
+- [x] Group SQLite storage and scheduling interfaces.
+- [x] Group repository proposals/approvals/publishing policy.
+- [x] Keep Telegram under `guardian/telegram/`, including pairing.
+- [x] Update imports and tests, preserve CLI entry points, run the full suite and
+  document the resulting package map (260 passed, one platform-dependent skip).
 
 Do not add a multi-agent framework or a broad abstraction layer just to rearrange files.
 

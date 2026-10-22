@@ -8,7 +8,7 @@ import time
 import httpx
 from pydantic import BaseModel, Field, SecretStr
 
-from ..network import enabled
+from guardian.core.network import enabled
 
 
 class TelegramSettings(BaseModel):
