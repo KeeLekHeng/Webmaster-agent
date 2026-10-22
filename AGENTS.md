@@ -1,6 +1,11 @@
 # Codex Instructions — Website Guardian
 
-Read `docs/TECHNICAL_GUIDE.md` before planning implementation. It consolidates architecture, security, setup, discovery, milestone outcomes and remaining work. Distinguish documented intent and historical observations from proven current website/infrastructure state. Update that guide rather than creating separate architecture, milestone or setup Markdown files; retain OpenSpec artifacts for its workflow.
+Read `docs/TECHNICAL_GUIDE.md` before planning implementation. It is the current consolidated reference and future context router. Distinguish documented intent and historical observations from proven current website/infrastructure state. Maintain ranked remaining work in `stackrank.md`; retain OpenSpec artifacts for its workflow.
+
+## Documentation context routing
+- Follow the documentation-library refactor in `stackrank.md`: turn the technical guide into a short index linking focused topic pages, rather than adding milestone diaries or duplicating instructions.
+- Keep new/refactored documentation pages at 300 lines maximum. Recursively split oversized topics at meaningful boundaries; update parent, child, related-topic and inbound links in the same change. The existing long guide is a pending migration, not an already compliant router.
+- Start with the index and ingest relevant pages and prerequisites progressively. Read applicable security/authorization context before operational work. Verify line counts, local links/anchors and router reachability when moving or splitting pages. OpenSpec schema artifacts and generated runtime reports are not mechanically split under this rule.
 
 ## Mission
 Build **Website Guardian**, a separate Python/LangGraph-based website maintenance assistant. The first target is `https://estateplanning.com.my/`, whose source code is in a separate private GitHub repository. The user owns the website and has authorized planning and read-only assessment, **not production modification**.

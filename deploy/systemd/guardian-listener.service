@@ -1,0 +1,60 @@
+[Unit]
+Description=Website Guardian private read-only Telegram listener
+Wants=network-online.target
+After=network-online.target var-lib-guardian-work.mount
+Requires=var-lib-guardian-work.mount
+StartLimitIntervalSec=300
+StartLimitBurst=3
+
+[Service]
+Type=simple
+User=websiteguardian
+Group=websiteguardian
+Slice=guardian.slice
+RootDirectory=/var/lib/guardian/root
+MountAPIVFS=yes
+BindReadOnlyPaths=/usr /etc/ssl/certs /etc/resolv.conf /etc/nsswitch.conf /etc/hosts
+BindReadOnlyPaths=/opt/guardian/app:/app
+BindPaths=/var/lib/guardian/work:/work
+WorkingDirectory=/work
+EnvironmentFile=/etc/guardian/guardian.env
+Environment=PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 USER=websiteguardian HOME=/work
+Environment=GUARDIAN_CONFIG=/app/config/sites.json GUARDIAN_OUTPUT=reports GUARDIAN_DB=data/guardian.sqlite3 GUARDIAN_STOP_FILE=data/STOP
+ExecStart=/app/.venv/bin/python -m guardian.cli telegram-listen --site estateplanning
+Restart=on-failure
+RestartSec=30
+TimeoutStopSec=30
+UMask=0077
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+ProtectSystem=strict
+ReadWritePaths=/work
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+ProtectKernelLogs=yes
+ProtectClock=yes
+RestrictSUIDSGID=yes
+RestrictNamespaces=yes
+RestrictRealtime=yes
+LockPersonality=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+SocketBindDeny=any
+SystemCallFilter=~bind listen
+SystemCallErrorNumber=EPERM
+SystemCallArchitectures=native
+ProtectProc=invisible
+ProcSubset=pid
+OOMScoreAdjust=1000
+Nice=10
+StandardOutput=journal
+StandardError=journal
+LogRateLimitIntervalSec=60
+LogRateLimitBurst=30
+LogNamespace=guardian
+
+[Install]
+WantedBy=multi-user.target

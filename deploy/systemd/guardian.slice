@@ -1,0 +1,11 @@
+[Unit]
+Description=Website Guardian shared resource budget
+
+[Slice]
+CPUQuota=15%
+CPUWeight=10
+MemoryHigh=160M
+MemoryMax=192M
+MemorySwapMax=0
+TasksMax=48
+IOWeight=10

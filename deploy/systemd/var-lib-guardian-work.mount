@@ -1,0 +1,9 @@
+[Unit]
+Description=Website Guardian dedicated bounded data filesystem
+
+[Mount]
+What=/var/lib/guardian/state.img
+Where=/var/lib/guardian/work
+Type=ext4
+Options=loop,nodev,nosuid,noexec
+TimeoutSec=30

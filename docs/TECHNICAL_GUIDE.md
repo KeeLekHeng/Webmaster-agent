@@ -4,7 +4,10 @@ Updated 22 October 2026. This is the maintained reference for architecture,
 security, setup, operations and remaining work. It replaces separate blueprint,
 milestone, walkthrough, setup and TODO documents; historical versions remain in
 Git. OpenSpec change specifications and acceptance records remain separate.
-Update this guide when behavior changes instead of creating another milestone file.
+Until the planned split, update this guide when behavior changes instead of creating
+another milestone file. See [stackrank.md](../stackrank.md) for the context-library
+refactor: a short router, linked topic pages capped at 300 lines, and recursive
+splitting with updated links when a topic outgrows that limit.
 
 ## Contents
 
@@ -29,10 +32,10 @@ Website Guardian is a separate Python/LangGraph maintenance assistant for
 then SEO. Deterministic tools collect facts; optional Claude reasoning explains
 and prioritizes evidence-backed review actions. Commercial demand is unvalidated.
 
-Guardian runs on the owner's Windows computer. Public audits, Search Console,
-PageSpeed, Telegram reports and local scheduling are implemented. The website is
-reported to run on a DigitalOcean VPS; Guardian is not deployed there. A dedicated
-Guardian VPS remains future work.
+Guardian now runs as an isolated service on the existing SIS VPS. Public audits,
+Search Console, PageSpeed, Telegram reports and weekly scheduling are implemented.
+Windows tasks are disabled and its STOP marker remains set. A dedicated Guardian
+VPS remains future work; see [current deployment proof](vps.md).
 
 Tracked defaults leave scheduling and Telegram disabled. On 22 October the owner
 enabled this computer's weekly digest and supervised Telegram listener. Ordinary
@@ -152,7 +155,8 @@ inspectable; stopping does not unregister scheduled tasks.
 
 Known boundaries: local owner processes can alter local files/state, model prose
 needs review, and collector failure is not proof of outage. Never-alone action:
-production deployment. Hosting gap: safe shared-host isolation is unverified.
+production deployment. Shared-host isolation passed smoke/live checks; ongoing
+capacity and the first automatic digest still need observation.
 Scale bottleneck: human review. The governance appendix is a design reference,
 not a compliance certification or definitive Malaysian legal guidance.
 
@@ -509,6 +513,9 @@ and 0.19 MiB under data, so there is no immediate disk pressure.
 
 ## Discovery and VPS boundaries
 
+For the current inspected host and prepared restricted setup, follow the linked
+[temporary VPS deployment page](vps.md), including its administrator and cutover gates.
+
 Initial 19 October discovery inspected separately authorized website source, not
 production secrets or customer data. Local/remote HEAD then matched
 `9791eefcd5b5535c81c40cc3d108eb0b981d695e`; this is historical, not today's production
@@ -536,7 +543,8 @@ Local or dedicated-host operation remains preferred. Temporary same-host deploym
 requires measured capacity, separate restricted identity/container, credentials,
 storage and quotas; outbound-only communication; no website/database/Docker socket/
 production SSH mounts. Containers do not remove shared-host risk. Safe separation
-on the existing VPS has not been established.
+was verified for the installed Guardian sandbox; ongoing host capacity still needs
+observation. Follow the deployment page for current evidence and cutover state.
 
 Dedicated VPS cutover must independently provision secrets, coordinate SQLite
 backup/transfer, move selected reports, stop the old scheduler/poller before
@@ -584,15 +592,10 @@ of these changes, so no website rollback is involved.
 
 ## Remaining work
 
-- Verify the first automatic Monday digest and real missed-run behavior.
-- Implement retention separately with preview, aggregation and protected references.
-- Consider more frequent speed samples for stronger comparisons.
-- Prepare dedicated VPS identity, secrets, backup and state cutover.
-- Corroborate keyword/content recommendations before human-reviewed edits,
-  particularly legal/estate-planning content.
-- Preserve the owner's idea: assess relevant new security advisories against a
-  verified dependency inventory. Headlines alone do not prove site exposure.
-- Validate service demand before multi-tenancy, billing or dashboards.
+The canonical ranked backlog is [stackrank.md](../stackrank.md). It includes the
+documentation routing refactor, weekly verification, retention, speed/SEO evidence,
+VPS cutover, dependency advisories and service-demand validation. Keep priorities
+there rather than maintaining a second task list in this guide.
 
 References: [governance appendix](PE6202_Group_Project_2_-_Appendix.pdf),
 [OpenSpec records](../openspec/changes/), [agent instructions](../AGENTS.md).

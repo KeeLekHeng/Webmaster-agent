@@ -37,6 +37,7 @@ enabled; the computer must be on, online and logged in.
 
 See the **[technical guide](docs/TECHNICAL_GUIDE.md)** for architecture, package map,
 security, integration setup, commands, scheduling, storage, retention recommendations,
-validation and remaining work. Keep that guide current instead of adding separate
-milestone/setup documents. OpenSpec change records remain under `openspec/`;
+validation and remaining work. The ranked backlog and planned linked context library
+are in [stackrank.md](stackrank.md): focused pages of at most 300 lines, reached
+through a short technical router. OpenSpec change records remain under `openspec/`;
 agent instructions are in [AGENTS.md](AGENTS.md).

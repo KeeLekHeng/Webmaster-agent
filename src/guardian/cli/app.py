@@ -115,7 +115,9 @@ def main():
                 print(schedule.model_dump_json(indent=2))
                 print("Monday 09:00 Asia/Kuala_Lumpur. Preview only; no collection or delivery.")
                 return 0
-            result = run_weekly(schedule)
+            result = run_weekly(schedule, sites=os.getenv("GUARDIAN_CONFIG", "config/sites.json"),
+                                output=os.getenv("GUARDIAN_OUTPUT", "reports"),
+                                history=os.getenv("GUARDIAN_DB", "data/guardian.sqlite3"))
             print(json.dumps(result))
             return 1 if result["status"] in {"partial", "interrupted"} else 0
         if args.command in TELEGRAM_COMMANDS:
