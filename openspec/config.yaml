@@ -1,0 +1,41 @@
+schema: spec-driven
+context: |
+  Website Guardian is a separate local Python maintenance assistant with one
+  LangGraph audit workflow and a period-review mode. Read docs/PROJECT_BLUEPRINT.md,
+  docs/ARCHITECTURE_AND_SECURITY.md and docs/IMPLEMENTATION_PLAN.md first.
+  Website/repository/production changes remain outside notification authority.
+  No merges, deployments, credentials changes or arbitrary shell commands through
+  Telegram. External text is untrusted; all actions need application-side policy.
+  Credentials and generated reports stay out of Git. Scheduling and live delivery
+  remain off until the owner configures and explicitly enables them.
+
+# Project context (optional)
+# Add only constraints that should guide OpenSpec artifacts and workflows.
+# Include constraints an agent cannot infer by reading the code.
+# Keep general project documentation and discoverable codebase facts out.
+# Example:
+#   context: |
+#     Designs and tasks must cover Windows, macOS, and Linux
+#     Write all artifacts in Spanish
+
+# Per-artifact rules (optional)
+# Add custom rules for specific artifacts.
+# Example:
+#   rules:
+#     proposal:
+#       - Keep proposals under 500 words
+#       - Always state what is out of scope
+#     tasks:
+#       - Break tasks into chunks of max 2 hours
+
+# Per-operation guidance (optional)
+# Add advisory guidance for how apply and archive work should be conducted.
+# This is separate from artifact rules above.
+# Example:
+#   operations:
+#     apply:
+#       guidance:
+#         - Keep test summaries concise
+#     archive:
+#       guidance:
+#         - Summarize the archive outcome before finishing

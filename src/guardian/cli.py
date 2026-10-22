@@ -3,6 +3,7 @@ import json
 import os
 import sqlite3
 import subprocess
+import sys
 import httpx
 from pathlib import Path
 from dotenv import load_dotenv
@@ -12,15 +13,24 @@ from .network import enabled
 
 
 def main():
+    if os.name == "nt" and hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     load_dotenv(Path.cwd() / ".env", override=False, interpolate=False)
     parser = argparse.ArgumentParser(description="Local read-only Website Guardian")
     commands = parser.add_subparsers(dest="command", required=True)
     from .remediation_cli import COMMANDS, register
     register(commands)
+    from .telegram.cli import COMMANDS as TELEGRAM_COMMANDS, register as register_telegram
+    register_telegram(commands)
     commands.add_parser("explain", help="Explain the LangGraph workflow without network access")
     commands.add_parser("stop", help="Create the persistent local kill switch")
     commands.add_parser("resume", help="Remove the persistent local kill switch")
     commands.add_parser("gsc-auth-check", help="Test configured Google token refresh without querying search data")
+    pair = commands.add_parser("telegram-pair", help="Verify a private owner chat; does not enable delivery")
+    pairing_mode = pair.add_mutually_exclusive_group()
+    pairing_mode.add_argument("--check", action="store_true", help="Find the matching private-chat challenge")
+    pairing_mode.add_argument("--confirm", type=int, help="Confirm the verified numeric private chat ID")
+    pair.add_argument("--state", default="data/telegram.sqlite3")
     review = commands.add_parser("review", help="Compare search visibility and lab speed across equal periods")
     review.add_argument("--site", required=True)
     review.add_argument("--config", default=os.getenv("GUARDIAN_CONFIG", "config/sites.json"))
@@ -94,6 +104,23 @@ def main():
         return 0
     try:
         enabled()
+        if args.command in TELEGRAM_COMMANDS:
+            from .telegram.cli import run as run_telegram
+            return run_telegram(args)
+        if args.command == "telegram-pair":
+            from .telegram_pairing import PairingStore, pairing_identity
+            bot_id = pairing_identity()
+            store = PairingStore(args.state)
+            if args.check:
+                chat_id = store.check(bot_id)
+                print(f"Verified private chat candidate: {chat_id}. Confirm locally with: guardian telegram-pair --confirm {chat_id}")
+            elif args.confirm is not None:
+                store.confirm(bot_id, args.confirm)
+                print(f"Private owner enrolled. Set GUARDIAN_TELEGRAM_CHAT_ID={args.confirm} locally. Delivery remains disabled; no message sent.")
+            else:
+                challenge = store.begin(bot_id)
+                print(f"Send this exact message to your bot in its private chat within 5 minutes:\n/start {challenge}\nThen run guardian telegram-pair --check. Delivery remains disabled.")
+            return 0
         if args.command == "gsc-auth-check":
             from .google_auth import search_console_access, AUTH_NOTICES
             access = search_console_access()
@@ -161,6 +188,8 @@ def main():
         report = result["report"]
         directory = Path(result["directory"])
     except (ValueError, KeyError, OSError, sqlite3.Error, httpx.HTTPError) as exc:
+        if getattr(exc, "outcome", None) in ("uncertain", "unavailable", "rejected", "rate-limited"):
+            parser.exit(2, f"Telegram operation {exc.outcome}; raw API output omitted. Inspect telegram-status receipts before retrying.\n")
         if type(getattr(exc, "google_status", None)) is int:
             parser.exit(2, f"Google API returned HTTP {exc.google_status}; check API access/key/quota. No measurement saved. Raw response omitted.\n")
         parser.exit(2, f"Audit could not start/save ({type(exc).__name__}); check configuration and permissions.\n")

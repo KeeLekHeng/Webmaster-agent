@@ -231,3 +231,9 @@ implemented; [configure your own OAuth client and refresh token](docs/GOOGLE_AUT
 then run `guardian gsc-auth-check`. Live refresh and a Claude-assisted 14-day
 review completed successfully on 2026-10-20.
 Synthetic examples are explicitly labeled and are not live results.
+
+Telegram owner handoff now supports private pairing, manual summary/document sends,
+durable deduplication and foreground read-only `/status` / `/report` polling. New
+code is grouped in `src/guardian/telegram`. It starts no service or schedule; normal
+audits/reviews do not send messages automatically. See [Telegram setup](docs/TELEGRAM_SETUP.md)
+and the [module organization follow-up](docs/TODO.md).
