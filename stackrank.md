@@ -8,7 +8,7 @@ production changes, deletion, new credentials or additional scheduled jobs.
 | --- | --- | --- |
 | 1 | Split the technical guide into a routed context library | Planned; structure and acceptance criteria below |
 | 2 | Verify the first automatic weekly digest and missed-run behavior | Pending Monday execution; inspect task results, stage records and owner delivery |
-| 3 | Implement retention with preview and protected references | Planned: 90-day detail, 13-month numeric aggregates; no automatic deletion enabled |
+| 3 | Deploy and trial manual retention | Preview/apply implemented and tested locally: 90-day eligible detail, 13 months numeric observations; protected references and offline checks. VPS upgrade pending; no automatic deletion enabled. [Operations](docs/retention.md) |
 | 4 | Improve speed comparison coverage | Evaluate sample frequency; current weekly sampling is below the stronger regression threshold |
 | 5 | Corroborate SEO actions with scoped page/query evidence | Keep confidence explicit and content changes human-reviewed |
 | 6 | Move Guardian to a dedicated VPS | Temporary host cutover verified; owner confirmed bot reply. Keep reusable deployment sources and migrate fresh state later: [deployment guide](docs/vps.md) |

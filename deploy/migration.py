@@ -15,7 +15,7 @@ from contextlib import closing
 KEYS = {'ANTHROPIC_API_KEY','GUARDIAN_MODEL','GUARDIAN_GSC_PROPERTY',
         'GUARDIAN_GSC_CLIENT_ID','GUARDIAN_GSC_CLIENT_SECRET','GUARDIAN_GSC_REFRESH_TOKEN',
         'GUARDIAN_PAGESPEED_API_KEY','GUARDIAN_TELEGRAM_BOT_TOKEN','GUARDIAN_TELEGRAM_CHAT_ID'}
-DATABASES = {'data/guardian.sqlite3','data/telegram.sqlite3','data/weekly.sqlite3'}
+DATABASES = {'data/guardian.sqlite3','data/telegram.sqlite3','data/weekly.sqlite3','data/retention.sqlite3'}
 MAX_BYTES = 64 * 1024 * 1024
 
 

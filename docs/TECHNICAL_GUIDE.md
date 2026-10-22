@@ -308,6 +308,13 @@ PageSpeed needs its separate API/key configuration, not Search Console OAuth.
 
 ## Telegram
 
+`guardian telegram-menu --site estateplanning` configures the enrolled owner's
+private command menu: `/status`, `/report` and `/help`. It sends no report and
+does not start polling. Menu visibility grants no access; sender checks still
+apply. `/help` explains the saved-data commands. The menu uses Telegram's
+[scoped command API](https://core.telegram.org/bots/api#setmycommands) and
+[commands menu button](https://core.telegram.org/bots/api#setchatmenubutton).
+
 Create a dedicated BotFather bot and put the token in `.env`, initially disabled.
 A plain `/start` opens the chat but does not pair it with Guardian:
 
@@ -488,26 +495,31 @@ renders/uploads a minimized attachment in memory and retains local delivery meta
 not a separate attachment copy. Deleting files does not delete SQLite snapshots or
 Telegram/device copies. `reports/`, `data/` and `.env` are Git-ignored.
 
-### Recommended retention — not implemented or enabled
+### Retention policy and manual cleanup
+
+Manual preview/apply cleanup is implemented; see [retention operations](retention.md)
+for protected references, offline requirements and numeric-history semantics.
+No automatic cleanup schedule is enabled. The table below records the broader
+policy, including records that the cleanup command deliberately never purges.
 
 | Record | Recommendation |
 | --- | --- |
 | Detailed reports, query text, closed audit snapshots and old lab samples | 90 days, preserving live baselines and unresolved evidence |
-| Compact monthly numeric statistics | 13 months for longer trends; aggregation is not yet implemented |
+| Compact numeric observations bucketed by month | Current month plus previous 12 months; overlapping windows are not summed |
 | Routine logs | 30 days plus size limits; current rotation only happens at startup |
 | Approval/change audit records and referenced proposals | At least 12 months, longer while unresolved; an operator policy, not a legal claim |
 | Pairing, offsets, current issues, active policy, unresolved delivery/approval state | Keep while in use; no blanket age-based purge |
 | Compact delivery/job deduplication identifiers | Preserve while old artifacts/requests may be replayed, including restored backups |
 
 Ninety days is a useful detailed-history default, not permission to wipe databases
-or the data directory. A future cleanup command should preview candidates, use
+or the data directory. The manual cleanup command previews candidates, uses
 evidence dates rather than file modification times, preserve latest live state and
-unresolved references, coordinate with active runs, aggregate before deletion and
-save a redacted cleanup receipt. Backups need separate expiry; freeing SQLite file
+unresolved references, requires offline operation, preserves numeric observations
+before deletion and saves a redacted receipt. Backups need separate expiry; freeing SQLite file
 space is separate from deleting rows. Do not remove receipt/pairing/approval tables
 to reclaim space or bypass deduplication. Local cleanup cannot erase remote copies.
 
-No automated cleanup is enabled and no generated records are deleted by this
+No automated cleanup is enabled and no generated records were deleted by this
 documentation consolidation. A 22 October inventory found about 0.56 MiB of reports
 and 0.19 MiB under data, so there is no immediate disk pressure.
 

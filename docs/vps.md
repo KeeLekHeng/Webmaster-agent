@@ -16,6 +16,21 @@ Smoke proof at `/opt/guardian/readiness.json` records actual execution on
 
 ## Cleanup and future migration
 
+### Guardian code updates
+
+The retained [update helper](../deploy/update-guardian.sh) installs a reviewed
+platform-independent Guardian wheel offline. It refuses active weekly work, pauses
+the timer/listener, saves the previous package and consistent history backup in a
+private `/opt/guardian/update-*` directory, installs under CPU/memory limits, runs
+the sandbox smoke and restarts only Guardian units. Failures require inspection;
+do not overwrite newer operational state with a backup. It does not apply retention.
+Run it with administrator privileges and the exact reviewed wheel SHA256. The
+retention/menu update is staged at `/home/deploy/guardian-update-20261023`; installation
+is pending owner execution. Telegram command-menu registration is already live;
+the richer `/help` response and retention CLI require the package update.
+
+### Files to preserve
+
 Keep `deploy/`, its tests, dependency locks, configuration templates and this guide
 as reusable deployment sources. Keep live `/opt/guardian`, `/etc/guardian`,
 `/var/lib/guardian`, installed units and receipts. Reports, SQLite state and bot

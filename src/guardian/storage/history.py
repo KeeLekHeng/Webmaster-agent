@@ -40,7 +40,7 @@ class HistoryStore:
         self.path = Path(path)
         self.path.parent.mkdir(parents=True, exist_ok=True)
         with self.connect() as db:
-            if db.execute("PRAGMA user_version").fetchone()[0] not in (0, 1):
+            if db.execute("PRAGMA user_version").fetchone()[0] not in (0, 1, 2):
                 raise ValueError("Unsupported history database schema version")
             db.executescript("""
                 CREATE TABLE IF NOT EXISTS runs (
@@ -60,7 +60,8 @@ class HistoryStore:
                 CREATE TABLE IF NOT EXISTS jobs (
                     site_id TEXT NOT NULL, slot INTEGER NOT NULL, status TEXT NOT NULL,
                     created_at TEXT NOT NULL, PRIMARY KEY(site_id, slot));
-                PRAGMA user_version=1;
+                CREATE TABLE IF NOT EXISTS retention_deleted_runs(run_id TEXT PRIMARY KEY);
+                PRAGMA user_version=2;
             """)
 
     @contextmanager
@@ -100,6 +101,8 @@ class HistoryStore:
                 "unchanged": [], "resolved": [], "not_observed": [], "alerts_queued": 0}
         with self.connect() as db:
             db.execute("BEGIN IMMEDIATE")
+            if db.execute("SELECT 1 FROM retention_deleted_runs WHERE run_id=?", (report.run_id,)).fetchone():
+                raise PolicyError("Report was removed by retention; old runs cannot be recorded again")
             existing = db.execute("SELECT diff_json FROM runs WHERE run_id=?", (report.run_id,)).fetchone()
             if existing:
                 return json.loads(existing[0])

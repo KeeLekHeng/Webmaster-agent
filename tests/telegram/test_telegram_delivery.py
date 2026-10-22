@@ -251,8 +251,34 @@ def test_private_commands_replay_and_explicit_retrieval(env, tmp_path, config, s
     assert bot.handle(message(2, "/report")) == "sent"
     assert bot.handle(message(3, "/status")) == "sent"
     assert bot.handle(message(4, "/merge")) == "sent"
-    assert api.calls[-1][1]["text"] == "Supported read-only commands: /status and /report."
+    assert "/help" in api.calls[-1][1]["text"]
     assert len([c for c in api.calls if c[0] == "sendDocument"]) == 2
+
+
+def test_private_menu_and_help(env, tmp_path, config, saved):
+    from guardian.telegram.commands import COMMAND_MENU
+    api = API()
+    def menu_api(method, data=None, document=None):
+        if method in {"setMyCommands", "setChatMenuButton"}:
+            api.calls.append((method, data, document))
+            return True
+        return api(method, data, document)
+    bot, _ = owner(tmp_path, config, saved, menu_api)
+    assert bot.configure_menu() == "configured"
+    command_call = next(c for c in api.calls if c[0] == "setMyCommands")
+    assert command_call[1]["scope"] == {"type": "chat", "chat_id": 123}
+    assert command_call[1]["commands"] == COMMAND_MENU
+    assert not any(c[0].startswith("send") for c in api.calls)
+    assert bot.handle(message(10, "/help")) == "sent"
+    assert "do not run a fresh scan" in api.calls[-1][1]["text"]
+    assert bot.handle(message(11, "/help", chat={"id": 999, "type": "private"})) == "ignored"
+
+
+def test_menu_transport_rejects_other_scope(env):
+    with pytest.raises(ValueError, match="fixed private-owner"):
+        call("setMyCommands", {"commands": [], "scope": {"type": "default"}})
+    with pytest.raises(ValueError, match="fixed private-owner"):
+        call("setChatMenuButton", {"chat_id": 999, "menu_button": {"type": "commands"}})
 
 
 def test_command_response_rate_limit(env, tmp_path, config, saved):

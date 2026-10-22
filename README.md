@@ -24,6 +24,8 @@ py -m venv .venv
 guardian review --site estateplanning --llm claude
 guardian telegram-send --site estateplanning --preview
 guardian telegram-status --site estateplanning --details
+guardian telegram-menu --site estateplanning
+guardian retention --root .
 guardian stop
 ```
 
@@ -31,9 +33,10 @@ Reports and summaries live in ignored `reports/<run-id>/` folders. Local SQLite
 and operational state live in ignored `data/`. Secrets stay in `.env`. A code push
 does not upload those files. Automatic data deletion is not enabled.
 
-Source schedule/notification defaults are disabled. The owner's local installation
-has Monday 09:00 Malaysia weekly collection and a supervised Telegram listener
-enabled; the computer must be on, online and logged in.
+Source schedule/notification defaults are disabled. The owner's VPS installation
+has Monday 09:00 Malaysia weekly collection and a supervised Telegram listener.
+Windows tasks remain disabled. See [deployment status](docs/vps.md) and
+[preview-first retention](docs/retention.md).
 
 See the **[technical guide](docs/TECHNICAL_GUIDE.md)** for architecture, package map,
 security, integration setup, commands, scheduling, storage, retention recommendations,

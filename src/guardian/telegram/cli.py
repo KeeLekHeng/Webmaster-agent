@@ -8,7 +8,7 @@ from guardian.telegram.reporting import load_report, render
 from guardian.telegram.service import OwnerBot
 from guardian.telegram.state import TelegramStore
 
-COMMANDS = {"telegram-send", "telegram-listen", "telegram-status", "telegram-reconcile"}
+COMMANDS = {"telegram-send", "telegram-listen", "telegram-status", "telegram-reconcile", "telegram-menu"}
 
 
 def register(commands):
@@ -47,6 +47,9 @@ def run(args):
         print(f"Attachment: guardian-report.md ({len(document)} bytes). Preview only; no message sent.")
         return 0
     bot = OwnerBot(args.site, config, args.reports, args.state)
+    if args.command == "telegram-menu":
+        print("Private-owner command menu: " + bot.configure_menu() + ". No message sent.")
+        return 0
     if args.command == "telegram-reconcile":
         print("Reconciliation: " + bot.store.reconcile(args.key,bot.destination,args.decision) + ". No message sent.")
         return 0

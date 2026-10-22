@@ -54,8 +54,13 @@ class _NoHTTPLogs(logging.Filter):
 
 def call(method, data=None, document=None, client=None):
     enabled()
-    if method not in {"getMe", "getWebhookInfo", "getUpdates", "sendMessage", "sendDocument"}:
+    if method not in {"getMe", "getWebhookInfo", "getUpdates", "sendMessage", "sendDocument", "setMyCommands", "setChatMenuButton"}:
         raise ValueError("Telegram method is not permitted")
+    if method in {"setMyCommands", "setChatMenuButton"}:
+        from guardian.telegram.commands import menu_payload
+        settings = TelegramSettings.load()
+        if data != menu_payload(method, settings.chat_id):
+            raise ValueError("Only the fixed private-owner menu is permitted")
     sending = method.startswith("send")
     if sending:
         settings = TelegramSettings.load()

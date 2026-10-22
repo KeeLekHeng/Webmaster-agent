@@ -23,6 +23,9 @@ def main():
     from guardian.telegram.cli import COMMANDS as TELEGRAM_COMMANDS, register as register_telegram
     register_telegram(commands)
     commands.add_parser("explain", help="Explain the LangGraph workflow without network access")
+    retention = commands.add_parser("retention", help="Preview 90-day cleanup; apply only with Guardian stopped")
+    retention.add_argument("--root", default=".", help="Guardian work directory containing data/ and reports/")
+    retention.add_argument("--apply", metavar="PREVIEW_FINGERPRINT", help="Apply the exact reviewed preview offline")
     commands.add_parser("stop", help="Create the persistent local kill switch")
     commands.add_parser("resume", help="Remove the persistent local kill switch")
     commands.add_parser("gsc-auth-check", help="Test configured Google token refresh without querying search data")
@@ -75,6 +78,14 @@ def main():
     due.add_argument("--database", default=os.getenv("GUARDIAN_DB", "data/guardian.sqlite3"))
     due.add_argument("--output", default=os.getenv("GUARDIAN_OUTPUT", "reports"))
     args = parser.parse_args()
+    if args.command == "retention":
+        from guardian.storage.retention import inspect, apply
+        try:
+            result = apply(args.root, args.apply) if args.apply else inspect(args.root)
+            print(json.dumps(result, indent=2))
+            return 0
+        except (ValueError, KeyError, OSError, sqlite3.Error, TypeError):
+            parser.exit(2, "Retention blocked: check paths, data integrity, stopped services and preview fingerprint. Raw records omitted.\n")
     if args.command in COMMANDS:
         from guardian.remediation.cli import run
         try:

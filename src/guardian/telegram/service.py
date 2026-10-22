@@ -35,6 +35,14 @@ class OwnerBot:
             raise ValueError("Telegram configuration changed; restart and verify enrollment")
         self.store.authorize(self.bot_id, current.chat_id)
 
+    def configure_menu(self):
+        from guardian.telegram.commands import menu_payload
+        for method in ("setMyCommands", "setChatMenuButton"):
+            self.guard()
+            if self.api(method, menu_payload(method, self.settings.chat_id)) is not True:
+                raise ValueError("Command menu setup not confirmed; safe to retry")
+        return "configured"
+
     def deliver(self, method, data, key, document=None):
         self.guard()
         key = digest(self.destination + ":" + key)
@@ -132,7 +140,8 @@ class OwnerBot:
                         # Delivery errors never fall back to a second message.
                         outcome = self.report(context=context)
                 else:
-                    text_out = self.status_text() if text in ("/status", "/status@" + self.username) else "Supported read-only commands: /status and /report."
+                    from guardian.telegram.commands import HELP_TEXT
+                    text_out = self.status_text() if text in ("/status", "/status@" + self.username) else HELP_TEXT
                     outcome = self.deliver("sendMessage", {"text": text_out, "parse_mode": "HTML", "link_preview_options": {"is_disabled": True}}, context)
                 self.store.finish_command(self.bot_id, uid, outcome)
                 return outcome
