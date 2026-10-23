@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 from guardian.maintenance.policy import FILES, SECTIONS, STAGES, changes, declared, digest, manifest, security_gate, select, version
 from guardian.maintenance.registry import metadata
 from guardian.maintenance.fixtures import font_fixture
-from guardian.maintenance.sandbox import Sandbox, CheckFailure, command, export
+from guardian.maintenance.sandbox import Sandbox, CheckFailure, CheckTimeout, IntegrityFailure, command, export
 from guardian.maintenance import repairs
 
 MAX_FILE = 4 * 1024 * 1024
@@ -138,7 +138,7 @@ def run(repository, output, image, *, sandbox_factory=Sandbox, registry=metadata
         # Do not publish arbitrary registry/package/test output or credentials.
         report['status'] = 'blocked'
         report['failure_kind'] = type(exc).__name__
-        if isinstance(exc, CheckFailure):
+        if isinstance(exc, (CheckFailure, CheckTimeout, IntegrityFailure)):
             report['diagnostics'] = exc.diagnostics()
     finally:
         report['finished_at'] = datetime.now(timezone.utc).isoformat()

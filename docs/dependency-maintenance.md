@@ -140,6 +140,11 @@ ambiguous targets, shadowed bindings, unsafe names and malformed syntax. Budgets
 three existing files, 80 added/deleted lines total. Failed candidate state is
 discarded; the repaired candidate starts fresh, repeats frozen install, inventory,
 advisory checks and every test stage. A second failure blocks the batch.
+Browser execution stops after its first confirmed failed test; a passing browser
+stage still requires the entire suite to pass. Fixed JSON progress events mark
+each stage as running/passed. Source integrity is checked after each stage and
+on errors; violations report bounded safe path names, not file contents. Timeout
+and output-budget failures retain only fixed diagnostic signals in saved reports.
 
 The publisher fetches original files from the tested Git commit, independently
 replays the recipe with a separately installed trusted parser and compares exact

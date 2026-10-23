@@ -2,7 +2,7 @@ import hashlib
 import json
 import pytest
 from guardian.maintenance import fixtures
-from guardian.maintenance.sandbox import CheckFailure
+from guardian.maintenance.sandbox import CheckFailure, CheckTimeout, IntegrityFailure, Sandbox, command
 
 
 def test_diagnostics_persist_labels_not_raw_source_or_secrets():
@@ -12,6 +12,30 @@ def test_diagnostics_persist_labels_not_raw_source_or_secrets():
     assert {'turbopack-error','missing-module','font-error'}<=set(result['signals'])
     assert 'private-value' not in json.dumps(result)
     assert CheckFailure(b'arbitrary website output').diagnostics()['signals']==[]
+
+
+def test_timeout_keeps_bounded_private_diagnostics_without_raw_error_prose():
+    import sys
+    with pytest.raises(CheckTimeout) as caught:
+        command([sys.executable,'-c','import time; print("next/font error sk-ant-private-value", flush=True); time.sleep(10)'],timeout=.5)
+    result=caught.value.diagnostics()
+    assert result['timed_out'] is True and 'font-error' in result['signals']
+    assert 'private-value' not in str(caught.value) + json.dumps(result)
+
+
+def test_integrity_fails_at_first_changed_stage_and_identifies_only_paths(tmp_path,monkeypatch,capsys):
+    source=tmp_path/'tsconfig.json';source.write_text('original')
+    sandbox=Sandbox('sha256:'+'a'*64,tmp_path,tmp_path)
+    calls=[]
+    def mutate(path,argv,**kwargs):
+        calls.append(argv[-1]);source.write_text('private synthetic value')
+        return b''
+    monkeypatch.setattr(sandbox,'run',mutate)
+    with pytest.raises(IntegrityFailure) as caught:sandbox.checks(tmp_path,{})
+    assert calls==['lint']
+    diagnostic=caught.value.diagnostics()
+    assert diagnostic['stage']=='lint' and diagnostic['changed_paths']==['tsconfig.json']
+    assert 'private synthetic value' not in json.dumps(diagnostic)+capsys.readouterr().out
 
 
 def test_font_fixture_is_serializable_and_uses_only_cached_loopback_bytes(tmp_path,monkeypatch):

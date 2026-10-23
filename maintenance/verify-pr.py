@@ -3,7 +3,7 @@ import argparse
 import json
 import tempfile
 from pathlib import Path
-from sandbox import Sandbox, CheckFailure, export
+from sandbox import Sandbox, CheckFailure, CheckTimeout, IntegrityFailure, export
 from font_fixtures import font_fixture
 from policy import STAGES
 
@@ -24,15 +24,17 @@ def main():
             fixtures = root/'fixtures'
             report['font_fixtures'] = font_fixture(fixtures)
             sandbox = Sandbox(args.image, fixtures, Path(__file__).resolve().parent)
+            print(json.dumps({'sandbox_stage': 'install', 'status': 'running'}), flush=True)
             sandbox.install(source, True)
             report['stages']['install'] = 'passed'
+            print(json.dumps({'sandbox_stage': 'install', 'status': 'passed'}), flush=True)
             sandbox.checks(source, report['stages'])
             if report['stages'] != {s: 'passed' for s in STAGES}:
                 raise ValueError('Incomplete checks')
             report['status'] = 'verified'
     except Exception as exc:
         report['failure_kind'] = type(exc).__name__
-        if isinstance(exc, CheckFailure):
+        if isinstance(exc, (CheckFailure, CheckTimeout, IntegrityFailure)):
             report['diagnostics'] = exc.diagnostics()
     Path(args.output).write_text(json.dumps(report, indent=2), encoding='utf-8')
     print(json.dumps({'status': report['status'], 'stages': report['stages']}))

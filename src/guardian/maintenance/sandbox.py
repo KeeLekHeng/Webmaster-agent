@@ -37,27 +37,72 @@ class CheckFailure(ValueError):
             'missing-test-data': r'missing.*(?:supabase|environment)|supabase.*required',
             'missing-file': r'enoent|no such file or directory',
             'invalid-font-response': r'mocked.*response|missing mocked response|font.*response',
+            'browser-timeout': r'test timeout|timeout .*exceeded|timed out',
+            'browser-launch-error': r'browser.*closed|browser.*launch|executable doesn.t exist|pthread_create',
+            'test-assertion': r'expect\(|assertionerror|expect.*received',
         }
-        return {'stage': self.stage, 'signals': [label for label, pattern in patterns.items() if re.search(pattern, text)]}
+        locations = sorted(set(re.findall(r'tests/e2e/[a-z0-9_/-]+\.spec\.tsx?:\d+(?::\d+)?', text)))[:10]
+        return {'stage': self.stage, 'signals': [label for label, pattern in patterns.items() if re.search(pattern, text)],
+                'test_locations': locations}
+
+
+class CheckTimeout(subprocess.TimeoutExpired):
+    stage = None
+
+    def diagnostics(self):
+        return {**CheckFailure(self.output or b'', self.stage).diagnostics(), 'timed_out': True}
+
+
+class IntegrityFailure(ValueError):
+    def __init__(self, paths, stage):
+        super().__init__('Verification changed website source; publication blocked')
+        self.paths, self.stage = paths, stage
+
+    def diagnostics(self):
+        safe = [p for p in sorted(self.paths) if len(p)<200 and re.fullmatch(r'[A-Za-z0-9_./-]+',p)
+                and not any(part.startswith('.env') for part in p.split('/'))]
+        result = {'stage': self.stage, 'signals': ['source-integrity'], 'changed_paths': safe[:20], 'changed_count': len(self.paths)}
+        if isinstance(self.__context__, (CheckFailure, CheckTimeout)):
+            result['underlying'] = self.__context__.diagnostics()
+        return result
+
+
+class OutputBudgetFailure(CheckFailure):
+    def diagnostics(self):
+        result = super().diagnostics()
+        result['signals'].append('output-budget-exceeded')
+        return result
 
 def command(args, cwd=None, timeout=180, allowed=(0,)):
     with tempfile.TemporaryFile() as output, tempfile.TemporaryFile() as errors:
+        def bounded_tail():
+            result = b''
+            for stream in (output, errors):
+                stream.seek(max(0, os.fstat(stream.fileno()).st_size-32768))
+                result += stream.read(32768)
+            return result
         child = subprocess.Popen(args, cwd=cwd, stdout=output, stderr=errors, shell=False)
         deadline = time.monotonic() + timeout
         try:
             while child.poll() is None:
                 if time.monotonic() > deadline:
-                    raise subprocess.TimeoutExpired('maintenance command', timeout)
+                    raise CheckTimeout('maintenance command', timeout)
                 if os.fstat(output.fileno()).st_size + os.fstat(errors.fileno()).st_size > 8 * 1024 * 1024:
-                    raise ValueError('Maintenance output budget exceeded')
+                    raise OutputBudgetFailure(bounded_tail())
                 time.sleep(.05)
             if os.fstat(output.fileno()).st_size + os.fstat(errors.fileno()).st_size > 8 * 1024 * 1024:
-                raise ValueError('Maintenance command failed; raw output withheld')
+                raise OutputBudgetFailure(bounded_tail())
             output.seek(0)
             if child.returncode not in allowed:
                 errors.seek(0)
                 raise CheckFailure(output.read() + b'\n' + errors.read())
             return output.read()
+        except CheckTimeout as exc:
+            output.seek(0)
+            errors.seek(0)
+            raw = output.read(8 * 1024 * 1024)
+            exc.output = raw + errors.read(8 * 1024 * 1024 - len(raw))
+            raise
         finally:
             if child.poll() is None:
                 child.kill()
@@ -154,19 +199,27 @@ class Sandbox:
                 if p.is_symlink():
                     raise ValueError('Verification introduced a source symlink')
                 if p.is_file() and p.name not in {'next-env.d.ts', 'tsconfig.tsbuildinfo'}:
-                    result[str(p.relative_to(workspace))] = digest(p.read_bytes())
+                    result[p.relative_to(workspace).as_posix()] = digest(p.read_bytes())
             return result
         before = snapshot()
         try:
             for stage in STAGES[1:]:
+                print(json.dumps({'sandbox_stage': stage, 'status': 'running'}), flush=True)
                 try:
                     self.run(workspace, ['bash', '/trusted/check.sh', stage], timeout=1200)
-                except CheckFailure as exc:
+                except (CheckFailure, CheckTimeout) as exc:
                     exc.stage = stage
                     raise
                 result[stage] = 'passed'
+                print(json.dumps({'sandbox_stage': stage, 'status': 'passed'}), flush=True)
+                after = snapshot()
+                changed = {p for p in before.keys() | after.keys() if before.get(p) != after.get(p)}
+                if changed:
+                    raise IntegrityFailure(changed, stage)
         finally:
-            if snapshot() != before:
-                raise ValueError('Verification changed website source; publication blocked')
+            after = snapshot()
+            changed = {p for p in before.keys() | after.keys() if before.get(p) != after.get(p)}
+            if changed:
+                raise IntegrityFailure(changed, stage)
 
 
