@@ -40,7 +40,15 @@ jobs:
           python -m pip install --no-deps -e .
       - name: Build isolated toolchain
         run: docker build --iidfile /tmp/guardian-image-id -f maintenance/Dockerfile maintenance
+      - name: Install trusted repair parser
+        if: vars.GUARDIAN_COMPAT_REPAIRS_ENABLED == 'true'
+        run: npm install --prefix "$RUNNER_TEMP/guardian-parser" --ignore-scripts --no-package-lock typescript@6.0.3
       - name: Verify baseline and candidate
+        env:
+          GUARDIAN_COMPAT_REPAIRS_ENABLED: ${{ vars.GUARDIAN_COMPAT_REPAIRS_ENABLED }}
+          GUARDIAN_MAINTENANCE_MODEL: ${{ vars.GUARDIAN_MAINTENANCE_MODEL }}
+          ANTHROPIC_API_KEY: ${{ vars.GUARDIAN_COMPAT_REPAIRS_ENABLED == 'true' && secrets.GUARDIAN_MAINTENANCE_CLAUDE_KEY || '' }}
+          GUARDIAN_TYPESCRIPT_PATH: ${{ runner.temp }}/guardian-parser/node_modules/typescript
         run: |
           python -m guardian.maintenance.runner --repository .sis-checkout --output maintenance-artifact --image "$(cat /tmp/guardian-image-id)"
       - name: Bind verified result
@@ -111,8 +119,11 @@ jobs:
         with:
           name: dependency-verification
           path: maintenance-artifact
-      - name: Publish dependency-only PR
+      - name: Install trusted replay parser
+        run: npm install --prefix "$RUNNER_TEMP/guardian-parser" --ignore-scripts --no-package-lock typescript@6.0.3
+      - name: Publish verified maintenance PR
         env:
+          GUARDIAN_TYPESCRIPT_PATH: ${{ runner.temp }}/guardian-parser/node_modules/typescript
           GUARDIAN_SIS_WRITE_TOKEN: ${{ secrets.GUARDIAN_SIS_WRITE_TOKEN }}
           GUARDIAN_DEPENDENCY_PRS_ENABLED: ${{ vars.GUARDIAN_DEPENDENCY_PRS_ENABLED }}
           GUARDIAN_VERIFICATION_URL: https://github.com/KeeLekHeng/Webmaster-agent/actions/runs/${{ github.run_id }}

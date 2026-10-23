@@ -6,7 +6,7 @@ production changes, deletion, new credentials or additional scheduled jobs.
 
 | Rank | Work | Status / completion evidence |
 | --- | --- | --- |
-| 1 | Trial verified dependency maintenance and richer AI review | New owner priority: GitHub Actions baseline/candidate verification and compatible security/patch/minor PRs. Local implementation; real CI activation/trial pending. [Setup](docs/dependency-maintenance-setup.md) |
+| 1 | Trial verified dependency maintenance and richer AI review | Guardian Actions baseline/candidate checks, bounded compatibility recipes and independent SIS PR CI prepared. Review/merge SIS CI bootstrap; real CI activation/trial pending. [Setup](docs/dependency-maintenance-setup.md) |
 | 2 | Verify the first automatic weekly digest and missed-run behavior | Pending Monday execution; inspect task results, stage records and owner delivery |
 | 3 | Deploy and trial manual retention | Preview/apply implemented and tested locally: 90-day eligible detail, 13 months numeric observations; protected references and offline checks. VPS upgrade pending; no automatic deletion enabled. [Operations](docs/retention.md) |
 | 4 | Improve speed comparison coverage | Evaluate sample frequency; current weekly sampling is below the stronger regression threshold |

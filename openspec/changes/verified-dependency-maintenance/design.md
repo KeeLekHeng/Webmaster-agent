@@ -20,7 +20,7 @@ its minor), with no worsened known security advisory inventory. Major/transitive
 fixes requiring overrides are reported for human migration review.
 
 Publication runs in a separate job that never executes candidate code. It receives
-only two bounded text files and a host-generated manifest; validates their hashes,
+only declared bounded text files and a host-generated manifest; validates their hashes,
 dependency-only semantic diff, required stages and unchanged base; then creates a
 new branch/commit/PR through bounded GitHub API routes. No force push or merge.
 The trusted workflow's own run and artifact are the attestation boundary; imported
@@ -35,3 +35,16 @@ containers or the shared VPS. A GitHub App is preferable for longer-term scoping
 Passing synthetic tests establishes tested behavior, not a guarantee of all live
 Supabase/email/data/authentication behavior. PRs must state coverage and exclusions.
 No claim of a live successful pipeline is made before an actual Actions run.
+
+## Owner-authorized compatibility extension
+The owner requested small source compatibility fixes and agreed to independent
+SIS PR CI. An optional schema-only planner receives eligible original display
+components and bounded compiler diagnostics. Trusted AST recipes, not raw patches,
+permit limited renames only. A fresh repaired candidate repeats all checks; the
+publisher independently reproduces the exact recipe on API-fetched originals.
+The writer never executes candidate code, imports its dependencies or passes its
+token to the parser subprocess. Backend/tests/config and arbitrary code stay blocked.
+
+SIS receives a separate reviewed CI setup change. Its workflow uses trusted base
+assets and a credential-free merge checkout export. Initial bootstrap fails until
+the owner reviews/merges those assets. No production deployment is added.

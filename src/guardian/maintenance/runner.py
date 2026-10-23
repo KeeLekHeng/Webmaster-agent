@@ -1,147 +1,22 @@
-"""GitHub-hosted controller. Website code only executes inside Docker, never here."""
+"""GitHub-hosted controller; website code only executes in isolated containers."""
 import argparse
 import json
 import os
-import re
 import shutil
-import stat
-import subprocess
 import tempfile
-import time
-import uuid
-import zipfile
 from pathlib import Path
 from datetime import datetime, timezone
 
-from guardian.maintenance.policy import FILES, SECTIONS, STAGES, audit, changes, declared, digest, manifest, security_gate, select, version
+from guardian.maintenance.policy import FILES, SECTIONS, STAGES, changes, declared, digest, manifest, security_gate, select, version
 from guardian.maintenance.registry import metadata
 from guardian.maintenance.fixtures import font_fixture
+from guardian.maintenance.sandbox import Sandbox, CheckFailure, command, export
+from guardian.maintenance import repairs
 
 MAX_FILE = 4 * 1024 * 1024
 
-
-def command(args, cwd=None, timeout=180, allowed=(0,)):
-    with tempfile.TemporaryFile() as output, tempfile.TemporaryFile() as errors:
-        child = subprocess.Popen(args, cwd=cwd, stdout=output, stderr=errors, shell=False)
-        deadline = time.monotonic() + timeout
-        try:
-            while child.poll() is None:
-                if time.monotonic() > deadline:
-                    raise subprocess.TimeoutExpired('maintenance command', timeout)
-                if os.fstat(output.fileno()).st_size + os.fstat(errors.fileno()).st_size > 8 * 1024 * 1024:
-                    raise ValueError('Maintenance output budget exceeded')
-                time.sleep(.05)
-            if child.returncode not in allowed or os.fstat(output.fileno()).st_size + os.fstat(errors.fileno()).st_size > 8 * 1024 * 1024:
-                raise ValueError('Maintenance command failed; raw output withheld')
-            output.seek(0)
-            return output.read()
-        finally:
-            if child.poll() is None:
-                child.kill()
-            child.wait()
-
-
-def export(repository, destination):
-    """Export committed regular files only; no worktree .env/git credentials/hooks."""
-    base = command(['git', '-C', str(repository), 'rev-parse', 'HEAD']).decode().strip()
-    if not re.fullmatch(r'[a-f0-9]{40}', base):
-        raise ValueError('Invalid base revision')
-    with tempfile.TemporaryFile() as temporary:
-        subprocess.run(['git', '-C', str(repository), 'archive', '--format=zip', base], stdout=temporary,
-                       stderr=subprocess.DEVNULL, timeout=60, check=True, shell=False)
-        temporary.seek(0)
-        with zipfile.ZipFile(temporary) as archive:
-            entries = archive.infolist()
-            if len(entries) > 10000 or sum(e.file_size for e in entries) > 512 * 1024 * 1024:
-                raise ValueError('Website export exceeds budget')
-            for entry in entries:
-                parts = entry.filename.split('/')
-                if entry.is_dir():
-                    continue
-                if ('..' in parts or entry.filename.startswith('/') or '\\' in entry.filename or
-                        stat.S_ISLNK(entry.external_attr >> 16)):
-                    raise ValueError('Unsafe export path')
-                if any(p.startswith('.env') or p in {'.git', '.github', '.npmrc', '.pnpmfile.cjs', 'pnpmfile.cjs', 'node_modules'} for p in parts):
-                    continue
-                path = destination / entry.filename
-                path.parent.mkdir(parents=True, exist_ok=True)
-                path.write_bytes(archive.read(entry))
-    if (destination / 'pnpm-workspace.yaml').exists():
-        raise ValueError('Workspace/hook policy requires separate review')
-    return base
-
-
-class Sandbox:
-    def __init__(self, image, fixtures, trusted):
-        if not re.fullmatch(r'sha256:[a-f0-9]{64}', image):
-            raise ValueError('Use a locally built image ID, not a mutable name')
-        self.image, self.fixtures, self.trusted = image, Path(fixtures).resolve(), Path(trusted).resolve()
-
-    def run(self, workspace, argv, *, network=False, allowed=(0,), timeout=900):
-        # No inherited environment, token, home, Docker socket, host PID or ports.
-        name = 'guardian-' + uuid.uuid4().hex
-        args = ['docker', 'run', '--name', name, '--rm', '--init', '--network', 'bridge' if network else 'none',
-                '--user', f'{os.getuid()}:{os.getgid()}', '--cap-drop=ALL', '--security-opt=no-new-privileges',
-                '--pids-limit=256', '--memory=4g', '--memory-swap=4g', '--cpus=2', '--read-only',
-                '--tmpfs', '/tmp:rw,nosuid,nodev,mode=1777,size=1g', '--shm-size=256m',
-                '--mount', f'type=bind,src={Path(workspace).resolve()},dst=/work',
-                '--mount', f'type=bind,src={self.fixtures},dst=/fixtures,readonly',
-                '--mount', f'type=bind,src={self.trusted},dst=/trusted,readonly', '-w', '/work']
-        environment = {'CI': 'true', 'HOME': '/tmp', 'NEXT_TELEMETRY_DISABLED': '1',
-                       'PLAYWRIGHT_BROWSERS_PATH': '/ms-playwright', 'E2E_TEST_DATA': '1',
-                       'NEXT_PUBLIC_SUPABASE_URL': 'http://127.0.0.1:54321',
-                       'NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY': 'synthetic-public-key',
-                       'NEXT_PUBLIC_SITE_URL': 'https://estateplanning.com.my',
-                       'NEXT_FONT_GOOGLE_MOCKED_RESPONSES': '/fixtures/fonts.cjs',
-                       'npm_config_ignore_pnpmfile': 'true', 'npm_config_registry': 'https://registry.npmjs.org'}
-        for key, value in environment.items():
-            args += ['-e', key + '=' + value]
-        args += [self.image, *argv]
-        try:
-            return command(args, timeout=timeout, allowed=allowed)
-        finally:
-            subprocess.run(['docker', 'rm', '--force', name], capture_output=True, timeout=30, shell=False)
-
-    def install(self, workspace, frozen):
-        return self.run(workspace, ['pnpm', 'install', '--ignore-scripts', '--ignore-pnpmfile',
-                                    '--strict-peer-dependencies',
-                                    '--frozen-lockfile' if frozen else '--no-frozen-lockfile'], network=True)
-
-    def audit(self, workspace):
-        return audit(json.loads(self.run(workspace, ['pnpm', 'audit', '--json'], network=True, allowed=(0, 1))))
-
-    def inventory(self, workspace, package):
-        rows = json.loads(self.run(workspace, ['pnpm', 'list', '--json', '--depth', '0']))
-        if not isinstance(rows, list) or len(rows) != 1:
-            raise ValueError('Resolved inventory unavailable')
-        resolved = {}
-        for section in SECTIONS:
-            for name in package.get(section, {}):
-                value = rows[0].get(section, {}).get(name, {}).get('version')
-                version(value)
-                resolved[name] = value
-        return resolved
-
-    def checks(self, workspace, result):
-        def snapshot():
-            result = {}
-            for p in workspace.rglob('*'):
-                if any(part in {'node_modules', '.next', 'test-results', 'playwright-report'} for part in p.relative_to(workspace).parts):
-                    continue
-                if p.is_symlink():
-                    raise ValueError('Verification introduced a source symlink')
-                if p.is_file() and p.name not in {'next-env.d.ts', 'tsconfig.tsbuildinfo'}:
-                    result[str(p.relative_to(workspace))] = digest(p.read_bytes())
-            return result
-        before = snapshot()
-        for stage in STAGES[1:]:
-            self.run(workspace, ['bash', '/trusted/check.sh', stage], timeout=1200)
-            result[stage] = 'passed'
-        if snapshot() != before:
-            raise ValueError('Verification changed website source; publication blocked')
-
-
-def run(repository, output, image, *, sandbox_factory=Sandbox, registry=metadata, fixtures=font_fixture):
+def run(repository, output, image, *, sandbox_factory=Sandbox, registry=metadata, fixtures=font_fixture,
+        repair_model=None, planner=repairs.propose, replayer=repairs.replay):
     output = Path(output)
     output.mkdir(parents=True, exist_ok=False)
     report = {'version': 1, 'status': 'blocked', 'started_at': datetime.now(timezone.utc).isoformat(),
@@ -219,13 +94,42 @@ def run(repository, output, image, *, sandbox_factory=Sandbox, registry=metadata
             if changes(original['package.json'], tested['package.json']) != report['updates']:
                 raise ValueError('Package manager changed unapproved manifest fields')
             report['phase'] = 'candidate-checks'
-            sandbox.checks(candidate, report['candidate'])
+            try:
+                sandbox.checks(candidate, report['candidate'])
+            except CheckFailure as exc:
+                if not repair_model or exc.stage != 'typecheck':
+                    raise
+                report['phase'] = 'candidate-compatibility-repair'
+                problems = repairs.diagnostics(exc.output)
+                plan = planner(source, problems, report['updates'], repair_model)
+                plan = repairs.validate(plan, report['updates'], problems)
+                source_originals = {e.path: (source/e.path).read_bytes() for e in plan.edits}
+                repaired = replayer(plan, source_originals, report['updates'])
+                # Discard everything touched by the failed tests/install before retrying.
+                shutil.rmtree(candidate)
+                shutil.copytree(source, candidate)
+                for name, data in {**tested, **repaired}.items():
+                    (candidate/name).write_bytes(data)
+                report['candidate'] = {}
+                sandbox.install(candidate, True)
+                report['candidate']['install'] = 'passed'
+                after = sandbox.audit(candidate)
+                if (sandbox.inventory(candidate, current) != resolved_after or not security_gate(before, after)):
+                    raise ValueError('Repair retry changed dependency/security evidence')
+                report['advisories_after'] = after
+                report['repair_plan'] = plan.model_dump()
+                report['repair_changed_lines'] = repairs.diff_budget(source_originals, repaired)
+                original.update(source_originals)
+                tested.update(repaired)
+                report['phase'] = 'repaired-candidate-checks'
+                sandbox.checks(candidate, report['candidate'])
             if any((candidate / name).read_bytes() != data for name, data in tested.items()):
                 raise ValueError('Tests changed dependency artifacts')
             report['files'] = {}
             for name, data in tested.items():
                 if not data or len(data) > MAX_FILE or b'\0' in data:
                     raise ValueError('Invalid dependency artifact')
+                (output / name).parent.mkdir(parents=True, exist_ok=True)
                 (output / name).write_bytes(data)
                 report['files'][name] = {'before_sha256': digest(original[name]), 'after_sha256': digest(data)}
             report['status'] = 'verified'
@@ -246,7 +150,8 @@ def main():
     parser.add_argument('--output', required=True)
     parser.add_argument('--image', required=True)
     args = parser.parse_args()
-    report = run(args.repository, args.output, args.image)
+    model = (os.getenv('GUARDIAN_MAINTENANCE_MODEL') or 'claude-haiku-4-5') if os.getenv('GUARDIAN_COMPAT_REPAIRS_ENABLED') == 'true' else None
+    report = run(args.repository, args.output, args.image, repair_model=model)
     print(json.dumps({'status': report['status'], 'updates': len(report['updates']), 'failure_kind': report.get('failure_kind')}))
     return 0 if report['status'] in {'verified', 'no-compatible-updates'} else 1
 

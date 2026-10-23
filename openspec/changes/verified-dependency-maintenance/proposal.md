@@ -11,8 +11,10 @@ The current shared VPS must not build or execute website dependency code.
 - Inventory pinned manifests/lockfiles; distinguish advisories from new releases.
 - Test the pinned baseline and candidate in disposable, credential-free containers
   on GitHub-hosted runners; mock external integrations and deny test egress.
-- Only publish package.json/pnpm-lock.yaml changes after all required stages pass,
+- Publish package.json/pnpm-lock.yaml and optional bounded compatibility recipes
+  after all required stages pass (including fresh full verification after repairs),
   rechecking base revision, artifact hashes and policy in a separate trusted job.
+- Prepare independent SIS PR CI using reviewed base verifier assets.
 - Default publication disabled until scoped Actions secrets and owner activation.
 - No automatic major upgrades, merges, deployments or production credentials.
 

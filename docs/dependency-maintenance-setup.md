@@ -35,6 +35,7 @@ Under the same Actions settings, open **Variables** → New repository variable:
 | `GUARDIAN_MAINTENANCE_ENABLED` | `true` when ready for the first verification |
 | `GUARDIAN_DEPENDENCY_PRS_ENABLED` | `false` initially |
 | `GUARDIAN_DEPENDENCY_AI_ENABLED` | `false` initially |
+| `GUARDIAN_COMPAT_REPAIRS_ENABLED` | `false` initially |
 
 Once the reviewed workflow/code is on Guardian's main branch, open Actions →
 **Verified SIS dependency maintenance** → Run workflow → main → Run workflow.
@@ -51,7 +52,7 @@ inserted into that Telegram digest. GitHub provides workflow/PR notifications.
 
 After a successful real verification trial, set
 `GUARDIAN_DEPENDENCY_PRS_ENABLED=true` and run the workflow again. A verified
-candidate can then create a dependency-only SIS PR. No per-PR publishing approval
+candidate can then create a scoped dependency maintenance SIS PR. No per-PR publishing approval
 is required under this standing policy; merge and deployment remain yours.
 Review the first real PR and its evidence before treating the automation as proven.
 
@@ -65,6 +66,28 @@ uploads a `dependency-review` report; it cannot approve the publishing job.
 Existing audit/SEO interpretation also gains impact, review action, verification
 and alternative-explanation fields after the upgraded Guardian package is installed
 on the VPS. Publishing this workflow does not update that VPS package.
+
+## Optional compatibility repairs and SIS CI
+
+After the baseline trial, use the same Claude Actions secret/model settings and
+set `GUARDIAN_COMPAT_REPAIRS_ENABLED=true` to permit one bounded TypeScript repair
+attempt. The key stays on the trusted controller host, never in website containers.
+Eligible private display-component source is sent to Claude for this feature;
+leave it false if source sharing is not desired. See the architecture scope rules.
+PRs can then include mechanical component repairs as well as the two package files.
+
+Review and merge the separate SIS CI setup branch `guardian/setup-pr-verification`
+in **KeeLekHeng/sisweb**. Its initial run deliberately fails if the base branch
+does not yet contain the reviewed verifier. That bootstrap failure is expected;
+review the setup files before merging, then manually run **SIS isolated PR
+verification** on main to establish the first real pass. Subsequent SIS PRs use
+the reviewed base verifier automatically; no extra secrets are needed there.
+Do not infer a successful build from setup/mocked tests. If branch protection is
+unavailable, inspect both repositories' successful checks before merging an upgrade.
+
+The SIS assets are vendored from Guardian's `maintenance/` and maintenance Python
+modules. Changes to the trusted verifier need a separate reviewed SIS setup PR;
+dependency automation cannot update CI assets. No automatic deployment is included.
 
 ## Stop, troubleshoot and recover
 

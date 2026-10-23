@@ -122,9 +122,10 @@ def retry_wait(seconds):
 
 
 class ClaudeInvestigator:
-    def __init__(self, model, system=SYSTEM):
+    def __init__(self, model, system=SYSTEM, output_schema=Investigation, max_tokens=4000):
         self.model = model
         self.system = system
+        self.output_schema, self.max_tokens = output_schema, max_tokens
         self.usage = {}
 
     def __call__(self, payload):
@@ -144,9 +145,9 @@ class ClaudeInvestigator:
                 enabled()
                 try:
                     response = client.messages.parse(
-                        model=self.model, max_tokens=4000, system=self.system,
+                        model=self.model, max_tokens=self.max_tokens, system=self.system,
                         messages=[{"role": "user", "content": json.dumps(payload, allow_nan=False)}],
-                        output_format=Investigation)
+                        output_format=self.output_schema)
                     break
                 except (anthropic.APIConnectionError, anthropic.APIStatusError) as exc:
                     status = getattr(exc, "status_code", None)

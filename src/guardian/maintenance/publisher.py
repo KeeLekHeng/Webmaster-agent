@@ -8,6 +8,7 @@ from pathlib import Path
 import httpx
 
 from guardian.maintenance.policy import FILES, changes, digest, security_gate, verification
+from guardian.maintenance import repairs
 
 REPOSITORY = 'KeeLekHeng/sisweb'
 
@@ -56,7 +57,7 @@ class GitHub:
             raise ValueError('Invalid base SHA')
         return sha
 
-    def originals(self, revision):
+    def originals(self, revision, paths=FILES):
         tree_id = self.request('GET', '/git/commits/' + revision)['tree']['sha']
         if not re.fullmatch(r'[a-f0-9]{40}', tree_id):
             raise ValueError('Invalid commit tree identity')
@@ -66,8 +67,25 @@ class GitHub:
         result = {'tree_sha': tree['sha']}
         if not re.fullmatch(r'[a-f0-9]{40}', result['tree_sha']):
             raise ValueError('Invalid tree identity')
-        for name in FILES:
-            entries = [entry for entry in tree['tree'] if entry.get('path') == name]
+        cache = {tree_id: tree}
+        for name in paths:
+            if name not in FILES and not repairs.allowed_path(name):
+                raise ValueError('Protected original source path')
+            current = tree
+            parts = name.split('/')
+            for part in parts[:-1]:
+                entries = [entry for entry in current['tree'] if entry.get('path') == part]
+                if len(entries) != 1 or entries[0].get('type') != 'tree' or entries[0].get('mode') != '040000':
+                    raise ValueError('Expected regular source directory')
+                subtree = entries[0]['sha']
+                if not re.fullmatch(r'[a-f0-9]{40}', subtree):
+                    raise ValueError('Invalid subtree identity')
+                if subtree not in cache:
+                    cache[subtree] = self.request('GET', '/git/trees/' + subtree)
+                current = cache[subtree]
+                if current.get('truncated'):
+                    raise ValueError('Incomplete source tree')
+            entries = [entry for entry in current['tree'] if entry.get('path') == parts[-1]]
             if len(entries) != 1 or entries[0].get('mode') != '100644' or entries[0].get('type') != 'blob':
                 raise ValueError('Expected regular dependency file')
             blob_id = entries[0]['sha']
@@ -80,29 +98,35 @@ class GitHub:
         return result
 
 
-def publish(directory, expected, api, *, enabled=False, run_url=''):
+def publish(directory, expected, api, *, enabled=False, run_url='', replayer=repairs.replay):
     if not enabled:
         return {'status': 'disabled'}
     directory = Path(directory)
     if directory.is_symlink() or any(p.is_symlink() for p in directory.rglob('*')):
         raise ValueError('Symlink artifact forbidden')
-    if {p.name for p in directory.iterdir()} != {*FILES, 'verification.json'}:
-        raise ValueError('Only exact dependency artifact files are allowed')
     raw = (directory / 'verification.json').read_bytes()
     if len(raw) > 2 * 1024 * 1024 or digest(raw) != expected:
         raise ValueError('Verification does not match the trusted job output')
     report = json.loads(raw)
     verification(report)
-    if report.get('status') != 'verified' or set(report.get('files', {})) != set(FILES):
+    names = set(report.get('files', {}))
+    source_names = names - set(FILES)
+    if (report.get('status') != 'verified' or not set(FILES).issubset(names) or len(source_names)>3
+            or not all(repairs.allowed_path(n) for n in source_names)):
         raise ValueError('Missing verified artifact')
+    actual = {p.relative_to(directory).as_posix() for p in directory.rglob('*') if p.is_file()}
+    if actual != names | {'verification.json'}:
+        raise ValueError('Only declared maintenance artifact files are allowed')
+    if bool(source_names) != bool(report.get('repair_plan')):
+        raise ValueError('Source changes require a bounded repair recipe')
     if not security_gate(report['advisories_before'], report['advisories_after']):
         raise ValueError('Security evidence contradicts outcome')
     base = api.base()
     if base != report['base_sha']:
         raise ValueError('Base changed; rerun verification')
-    originals = api.originals(base)
+    originals = api.originals(base, paths=sorted(names)) if source_names else api.originals(base)
     candidate = {}
-    for name in FILES:
+    for name in sorted(names):
         data = (directory / name).read_bytes()
         if not data or len(data) > 4 * 1024 * 1024 or b'\0' in data:
             raise ValueError('Invalid candidate file')
@@ -113,7 +137,14 @@ def publish(directory, expected, api, *, enabled=False, run_url=''):
     updates = changes(originals['package.json'], candidate['package.json'])
     if updates != report['updates']:
         raise ValueError('Dependency delta does not match verified policy')
-    identity = digest(base.encode() + b''.join(candidate[n] for n in FILES))[:20]
+    if source_names:
+        source_originals = {n: originals[n] for n in source_names}
+        reproduced = replayer(report['repair_plan'], source_originals, updates)
+        if reproduced != {n: candidate[n] for n in source_names}:
+            raise ValueError('Artifact differs from independently reproduced repair')
+        if repairs.diff_budget(source_originals, reproduced) != report.get('repair_changed_lines'):
+            raise ValueError('Repair diff budget does not match evidence')
+    identity = digest(base.encode() + b''.join(n.encode()+b'\0'+candidate[n] for n in sorted(names)))[:20]
     branch = 'guardian/dependencies-' + identity
     existing = api.request('GET', '/pulls', params={'state': 'all', 'head': 'KeeLekHeng:' + branch})
     if existing:
@@ -128,7 +159,7 @@ def publish(directory, expected, api, *, enabled=False, run_url=''):
     if api.request('GET', '/git/ref/heads/' + branch, missing=True) is not None:
         raise ValueError('Partial publication branch exists; reconcile manually')
     tree = []
-    for name in FILES:
+    for name in sorted(names):
         blob = api.request('POST', '/git/blobs', {'content': base64.b64encode(candidate[name]).decode(), 'encoding': 'base64'})
         tree.append({'path': name, 'mode': '100644', 'type': 'blob', 'sha': blob['sha']})
     new_tree = api.request('POST', '/git/trees', {'base_tree': originals['tree_sha'], 'tree': tree})
@@ -142,6 +173,10 @@ def publish(directory, expected, api, *, enabled=False, run_url=''):
     lines = ['Updates existing dependencies within the approved stable same-major policy.', '',
              '| Package | Before | After |', '| --- | --- | --- |']
     lines += [f"| {u['package']} | {u['before']} | {u['after']} |" for u in updates]
+    if source_names:
+        plan = repairs.validate(report['repair_plan'], updates)
+        lines += ['', 'Compatibility repairs (full candidate checks rerun after repair):']
+        lines += [f'- `{e.path}:{e.line}`: {e.kind}, `{e.old}` to `{e.new}` from `{e.module}`.' for e in plan.edits]
     lines += ['', 'Validation: frozen install, lint, TypeScript, unit tests, production build, integration tests and Playwright passed for both baseline and candidate.',
               'Tested base: ' + base,
               f"Reported advisory inventory: {len(report['advisories_before'])} before, {len(report['advisories_after'])} after.",

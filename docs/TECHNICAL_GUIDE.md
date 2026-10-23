@@ -112,7 +112,7 @@ Application-side policy grants authority; model instructions never do.
 | Bounded allowlisted reads, explanations and reports | A: scope, schemas, budgets and kill switch |
 | Notifications | A only to the enrolled, approved owner destination |
 | Manual PR publishing | H+A: eligible authenticated actor, exact artifact hash and expiring approval |
-| Verified dependency PRs | Separate owner-authorized standing policy; compatible versions, two-file scope, paired CI gates; defaults disabled |
+| Verified dependency PRs | Separate owner-authorized standing policy; compatible versions, bounded display-component repairs, paired CI gates; defaults disabled |
 | Merge, deployment, DNS/firewall/credential changes, restoration | H: no autonomous executor route |
 
 Public pages, repository files, reports and tool output are untrusted data. The
@@ -134,7 +134,10 @@ capped at 32 KiB and 20 findings, output at 4,000 tokens with up to five priorit
 advisory notes. Structured notes include impact, review action, verification and
 alternative explanations; all fields pass the same output policy. Dependency
 reviews may include validated public package names and stable versions; raw
-release prose and code remain excluded. LangSmith external tracing
+release prose and code remain excluded from advisory reviews. The separately
+enabled compatibility planner may receive bounded eligible display-component
+source and compiler diagnostics; see [maintenance boundaries](dependency-maintenance.md#bounded-compatibility-repairs).
+LangSmith external tracing
 is explicitly disabled. Pydantic and Python validate response structure, citation
 membership, duplicate notes and obvious unsafe command/URL patterns. Citation
 validity does not prove prose is semantically correct or establish causation.

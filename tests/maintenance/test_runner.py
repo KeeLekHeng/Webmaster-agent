@@ -2,7 +2,7 @@ import json
 import subprocess
 from pathlib import Path
 import pytest
-from guardian.maintenance import runner
+from guardian.maintenance import runner, sandbox as sandbox_module
 from guardian.maintenance.policy import STAGES
 
 
@@ -51,7 +51,7 @@ def test_paired_success_and_failure_are_bound_to_artifacts(setup,tmp_path,monkey
 def test_sandbox_does_not_inherit_credentials_or_expose_host_network(tmp_path,monkeypatch):
     captured=[]
     monkeypatch.setenv('GUARDIAN_SIS_WRITE_TOKEN','synthetic-secret')
-    monkeypatch.setattr(runner,'command',lambda args,**kw: captured.append(args) or b'')
+    monkeypatch.setattr(sandbox_module,'command',lambda args,**kw: captured.append(args) or b'')
     monkeypatch.setattr(subprocess,'run',lambda *a,**kw: None)
     sandbox=runner.Sandbox('sha256:'+'a'*64,tmp_path,tmp_path)
     monkeypatch.setattr(runner.os,'getuid',lambda:1001,raising=False)
@@ -69,7 +69,7 @@ def test_timeout_forces_container_cleanup(tmp_path,monkeypatch):
     monkeypatch.setattr(runner.os,'getuid',lambda:1001,raising=False)
     monkeypatch.setattr(runner.os,'getgid',lambda:1001,raising=False)
     def timeout(*a,**kw): raise subprocess.TimeoutExpired('docker',1)
-    monkeypatch.setattr(runner,'command',timeout)
+    monkeypatch.setattr(sandbox_module,'command',timeout)
     monkeypatch.setattr(subprocess,'run',lambda args,**kw: cleaned.append(args))
     with pytest.raises(subprocess.TimeoutExpired): runner.Sandbox('sha256:'+'a'*64,tmp_path,tmp_path).run(tmp_path,['false'])
     assert cleaned[0][:3]==['docker','rm','--force']
