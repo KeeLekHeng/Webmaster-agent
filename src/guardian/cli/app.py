@@ -26,6 +26,11 @@ def main():
     retention = commands.add_parser("retention", help="Preview 90-day cleanup; apply only with Guardian stopped")
     retention.add_argument("--root", default=".", help="Guardian work directory containing data/ and reports/")
     retention.add_argument("--apply", metavar="PREVIEW_FINGERPRINT", help="Apply the exact reviewed preview offline")
+    dependency = commands.add_parser('dependency-review', help='Explain a saved dependency CI artifact; never publish')
+    dependency.add_argument('--input', required=True)
+    dependency.add_argument('--output', default=os.getenv('GUARDIAN_OUTPUT', 'reports'))
+    dependency.add_argument('--llm', choices=['none', 'claude'], default='none')
+    dependency.add_argument('--model', default=os.getenv('GUARDIAN_MODEL'))
     commands.add_parser("stop", help="Create the persistent local kill switch")
     commands.add_parser("resume", help="Remove the persistent local kill switch")
     commands.add_parser("gsc-auth-check", help="Test configured Google token refresh without querying search data")
@@ -119,6 +124,11 @@ def main():
         return 0
     try:
         enabled()
+        if args.command == 'dependency-review':
+            from guardian.maintenance.review import review as dependency_review
+            result = dependency_review(args.input, args.output, args.llm, args.model)
+            print(json.dumps({'run_id': result.run_id, 'status': result.status, 'analysis': result.analysis.status}))
+            return 1 if result.status != 'complete' or result.analysis.status in {'unavailable', 'partial', 'rejected'} else 0
         if args.command == "weekly-digest":
             from guardian.scheduling.weekly import WeeklyConfig, run_weekly
             schedule = WeeklyConfig.model_validate_json(Path(args.schedule_config).read_bytes())

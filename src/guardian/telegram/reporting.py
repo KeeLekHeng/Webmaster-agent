@@ -227,6 +227,10 @@ def render(report):
         if note:
             details += ["**Advisory interpretation:** " + plain(clean(note.explanation)), "",
                         "**Uncertainty:** " + plain(clean(note.uncertainty,800)), ""]
+            for label, value in (("Potential impact", note.impact), ("Review action", note.recommended_action),
+                                 ("Verification", note.verification), ("Other explanations", note.alternative_explanations)):
+                if value:
+                    details += [f"**{label}:** " + plain(clean(value, 800)), ""]
     limitations = ["This is saved evidence, not a new scan. Model prose is advisory, not proven causation.",
                    "Details are minimized; raw tool output, configuration and internal paths are omitted."]
     limitations += [clean(line,1500) for line in report.limitations + report.analysis.notices]

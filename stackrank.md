@@ -6,13 +6,13 @@ production changes, deletion, new credentials or additional scheduled jobs.
 
 | Rank | Work | Status / completion evidence |
 | --- | --- | --- |
-| 1 | Split the technical guide into a routed context library | Planned; structure and acceptance criteria below |
+| 1 | Trial verified dependency maintenance and richer AI review | New owner priority: GitHub Actions baseline/candidate verification and compatible security/patch/minor PRs. Local implementation; real CI activation/trial pending. [Setup](docs/dependency-maintenance-setup.md) |
 | 2 | Verify the first automatic weekly digest and missed-run behavior | Pending Monday execution; inspect task results, stage records and owner delivery |
 | 3 | Deploy and trial manual retention | Preview/apply implemented and tested locally: 90-day eligible detail, 13 months numeric observations; protected references and offline checks. VPS upgrade pending; no automatic deletion enabled. [Operations](docs/retention.md) |
 | 4 | Improve speed comparison coverage | Evaluate sample frequency; current weekly sampling is below the stronger regression threshold |
 | 5 | Corroborate SEO actions with scoped page/query evidence | Keep confidence explicit and content changes human-reviewed |
 | 6 | Move Guardian to a dedicated VPS | Temporary host cutover verified; owner confirmed bot reply. Keep reusable deployment sources and migrate fresh state later: [deployment guide](docs/vps.md) |
-| 7 | Match security advisories to verified dependencies | Owner idea; establish versions/exposure before claiming risk |
+| 7 | Split the technical guide into a routed context library | Planned; structure and acceptance criteria below |
 | 8 | Validate demand for a maintenance service | Before multi-tenancy, billing or dashboards |
 
 ## Documentation library refactor

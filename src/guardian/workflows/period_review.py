@@ -241,6 +241,10 @@ def summary(report, snapshot):
         if note:
             lines += [f"   Claude/advisory interpretation: {plain(note.explanation)}",
                       f"   Uncertainty: {plain(note.uncertainty)}"]
+            for label, value in (("Potential impact", note.impact), ("Review action", note.recommended_action),
+                                 ("Verification", note.verification), ("Other explanations", note.alternative_explanations)):
+                if value:
+                    lines.append(f"   {label}: {plain(value)}")
     if len(report.findings) > 5:
         lines.append(f"{len(report.findings)-5} further actions remain in report.md.")
     lines += ["", "## Speed measurements", ""]

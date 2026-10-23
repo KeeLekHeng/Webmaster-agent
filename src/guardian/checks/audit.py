@@ -236,6 +236,18 @@ def save_report(report, output):
         lines += [f"### {e.id} {e.check}: {e.outcome}", "", "```json",
                   json.dumps(e.model_dump(), ensure_ascii=True, indent=2).replace("`", "\\u0060"), "```", ""]
     lines += ["## Limitations", ""] + [f"- {x}" for x in report.limitations]
+    if report.analysis.notes:
+        from guardian.reporting.summary import plain
+        lines += ["", "## Prioritized review (AI advisory)", ""]
+        for note in report.analysis.notes:
+            lines += [f"### {plain(note.finding_id)} — {plain(note.assessment)}", "",
+                      f"Evidence: {', '.join(plain(eid) for eid in note.evidence_ids)}", "",
+                      plain(note.explanation), ""]
+            for label, value in (("Potential impact", note.impact), ("Review action", note.recommended_action),
+                                 ("Verification", note.verification), ("Other explanations", note.alternative_explanations),
+                                 ("Uncertainty", note.uncertainty)):
+                if value:
+                    lines += [f"**{label}:** {plain(value)}", ""]
     lines += ["", "## Investigation (advisory)", "", "```json",
               report.analysis.model_dump_json(indent=2).replace("`", "\\u0060"), "```",
               "", "## Workflow execution", "", "```json",

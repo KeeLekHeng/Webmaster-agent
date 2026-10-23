@@ -112,6 +112,7 @@ Application-side policy grants authority; model instructions never do.
 | Bounded allowlisted reads, explanations and reports | A: scope, schemas, budgets and kill switch |
 | Notifications | A only to the enrolled, approved owner destination |
 | Manual PR publishing | H+A: eligible authenticated actor, exact artifact hash and expiring approval |
+| Verified dependency PRs | Separate owner-authorized standing policy; compatible versions, two-file scope, paired CI gates; defaults disabled |
 | Merge, deployment, DNS/firewall/credential changes, restoration | H: no autonomous executor route |
 
 Public pages, repository files, reports and tool output are untrusted data. The
@@ -129,7 +130,11 @@ Raw HTML, cookies, customer submissions and response bodies are not persisted.
 
 Claude sees bounded numeric/boolean observations, known labels and opaque IDs,
 not URLs, query phrases, page text, credentials or repository content. Inputs are
-capped at 32 KiB and 20 findings, output at 1,800 tokens. LangSmith external tracing
+capped at 32 KiB and 20 findings, output at 4,000 tokens with up to five prioritized
+advisory notes. Structured notes include impact, review action, verification and
+alternative explanations; all fields pass the same output policy. Dependency
+reviews may include validated public package names and stable versions; raw
+release prose and code remain excluded. LangSmith external tracing
 is explicitly disabled. Pydantic and Python validate response structure, citation
 membership, duplicate notes and obvious unsafe command/URL patterns. Citation
 validity does not prove prose is semantically correct or establish causation.
@@ -428,6 +433,11 @@ deterministic checks, durable UTC slots and a one-hour audit lease. It is separa
 from weekly collection. See [Windows task settings](https://learn.microsoft.com/en-us/powershell/module/scheduledtasks/new-scheduledtasksettingsset).
 
 ## Assisted repository changes
+
+The owner-authorized follow-up for weekly dependency maintenance has a separate
+[architecture](dependency-maintenance.md) and [activation guide](dependency-maintenance-setup.md).
+It uses GitHub-hosted sandbox verification and a disabled-by-default scoped PR
+publisher. A real Actions trial is pending; the manual flow below is unchanged.
 
 Tracked `config/repositories.json` has publishing off/no approvers; ignored local
 owner policy is selected by `GUARDIAN_REPOSITORIES`. Manual commands include:

@@ -1,0 +1,120 @@
+name: Verified SIS dependency maintenance
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 23 * * 0' # Monday 07:00 Malaysia; allow time before the Guardian digest.
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sis-dependency-maintenance
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    if: github.ref == 'refs/heads/main' && vars.GUARDIAN_MAINTENANCE_ENABLED == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    outputs:
+      eligible: ${{ steps.result.outputs.eligible }}
+      fingerprint: ${{ steps.result.outputs.fingerprint }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          repository: KeeLekHeng/sisweb
+          ref: main
+          token: ${{ secrets.GUARDIAN_SIS_READ_TOKEN }}
+          path: .sis-checkout
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: '3.12'
+      - name: Install trusted controller
+        run: |
+          python -m pip install -r requirements-dev.lock
+          python -m pip install --no-deps -e .
+      - name: Build isolated toolchain
+        run: docker build --iidfile /tmp/guardian-image-id -f maintenance/Dockerfile maintenance
+      - name: Verify baseline and candidate
+        run: |
+          python -m guardian.maintenance.runner --repository .sis-checkout --output maintenance-artifact --image "$(cat /tmp/guardian-image-id)"
+      - name: Bind verified result
+        id: result
+        run: |
+          python - <<'PY'
+          import hashlib,json,os,pathlib
+          raw=pathlib.Path('maintenance-artifact/verification.json').read_bytes()
+          report=json.loads(raw)
+          with open(os.environ['GITHUB_OUTPUT'],'a') as output:
+              output.write('eligible='+str(report['status']=='verified').lower()+'\n')
+              output.write('fingerprint='+hashlib.sha256(raw).hexdigest()+'\n')
+          PY
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always()
+        with:
+          name: dependency-verification
+          path: maintenance-artifact/
+          retention-days: 30
+          if-no-files-found: warn
+  interpret:
+    needs: verify
+    if: always() && needs.verify.result != 'skipped' && vars.GUARDIAN_DEPENDENCY_AI_ENABLED == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: '3.12'
+      - run: |
+          python -m pip install -r requirements-dev.lock
+          python -m pip install --no-deps -e .
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: dependency-verification
+          path: maintenance-artifact
+      - name: Explain evidence without executing candidate code
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.GUARDIAN_MAINTENANCE_CLAUDE_KEY }}
+          GUARDIAN_MODEL: ${{ vars.GUARDIAN_MAINTENANCE_MODEL }}
+        run: python -m guardian.cli dependency-review --input maintenance-artifact/verification.json --output dependency-reports --llm claude
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always()
+        with:
+          name: dependency-review
+          path: dependency-reports/
+          retention-days: 30
+          if-no-files-found: warn
+  publish:
+    needs: verify
+    if: needs.verify.outputs.eligible == 'true' && vars.GUARDIAN_DEPENDENCY_PRS_ENABLED == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: '3.12'
+      - run: |
+          python -m pip install -r requirements-dev.lock
+          python -m pip install --no-deps -e .
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: dependency-verification
+          path: maintenance-artifact
+      - name: Publish dependency-only PR
+        env:
+          GUARDIAN_SIS_WRITE_TOKEN: ${{ secrets.GUARDIAN_SIS_WRITE_TOKEN }}
+          GUARDIAN_DEPENDENCY_PRS_ENABLED: ${{ vars.GUARDIAN_DEPENDENCY_PRS_ENABLED }}
+          GUARDIAN_VERIFICATION_URL: https://github.com/KeeLekHeng/Webmaster-agent/actions/runs/${{ github.run_id }}
+          EXPECTED_FINGERPRINT: ${{ needs.verify.outputs.fingerprint }}
+        run: python -m guardian.maintenance.publisher --artifact maintenance-artifact --expected "$EXPECTED_FINGERPRINT"

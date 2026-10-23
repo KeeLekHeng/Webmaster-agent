@@ -34,6 +34,27 @@ def note(**updates):
     return InvestigationNote(**fields)
 
 
+@pytest.mark.parametrize('field', ['impact', 'recommended_action', 'verification', 'alternative_explanations'])
+def test_expanded_advice_obeys_command_and_secret_boundaries(report, monkeypatch, field):
+    payload, _ = project_evidence(report)
+    bad = Investigation(priorities=[note(**{field:'Run sudo to change production'})])
+    assert filter_investigation(bad, payload) == ([], 1)
+    monkeypatch.setenv('SYNTHETIC_API_KEY','private-test-value-123')
+    bad = Investigation(priorities=[note(**{field:'private-test-value-123'})])
+    assert filter_investigation(bad, payload) == ([], 1)
+
+
+def test_expanded_advice_is_readable_in_saved_report(config,report,tmp_path):
+    result = run(config,report,tmp_path,'claude',lambda p: Investigation(priorities=[note(
+        impact='HTTPS policy may be weaker for repeat visits.',
+        recommended_action='Review the edge header configuration.',
+        verification='Repeat the header observation after the reviewed change.',
+        alternative_explanations='A proxy may be adding headers on another route.')]))
+    text=(tmp_path/result['report'].run_id/'report.md').read_text()
+    assert '**Potential impact:**' in text
+    assert '**Verification:**' in text
+
+
 def run(config, report, tmp_path, mode="demo", investigator=None, **kwargs):
     return run_workflow({"site_id": "example", "config": config, "mode": mode,
                          "model": "test-model", "output": str(tmp_path), **kwargs},
@@ -184,7 +205,7 @@ def test_sdk_structured_output_without_network(monkeypatch):
     assert result == answer
     assert "tools" not in captured
     assert "output_config" in captured
-    assert captured["max_tokens"] == 1800
+    assert captured["max_tokens"] == 4000
     assert client.usage == {"input_tokens": 50, "output_tokens": 60, "request_attempts": 1}
 
 

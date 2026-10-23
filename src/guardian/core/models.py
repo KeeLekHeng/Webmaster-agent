@@ -39,6 +39,10 @@ class InvestigationNote(BaseModel):
     assessment: Literal["confirmed", "suspected", "unknown"]
     explanation: str = Field(min_length=1, max_length=1200)
     uncertainty: str = Field(min_length=1, max_length=600)
+    impact: str = Field(default="", max_length=800)
+    recommended_action: str = Field(default="", max_length=800)
+    verification: str = Field(default="", max_length=800)
+    alternative_explanations: str = Field(default="", max_length=600)
 
 
 class Investigation(BaseModel):

@@ -44,3 +44,7 @@ validation and remaining work. The ranked backlog and planned linked context lib
 are in [stackrank.md](stackrank.md): focused pages of at most 300 lines, reached
 through a short technical router. OpenSpec change records remain under `openspec/`;
 agent instructions are in [AGENTS.md](AGENTS.md).
+
+Verified dependency maintenance has a separate [design](docs/dependency-maintenance.md)
+and [Actions setup guide](docs/dependency-maintenance-setup.md). Automatic dependency
+PRs default off pending a real baseline/candidate trial. Merge/deployment remain manual.
