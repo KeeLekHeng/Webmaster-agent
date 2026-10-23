@@ -22,6 +22,24 @@ class CheckFailure(ValueError):
         super().__init__('Verification command failed; raw output withheld')
         self.output, self.stage = output, stage
 
+    def diagnostics(self):
+        """Fixed labels only; no raw compiler/source/environment text is persisted."""
+        text = self.output.decode('utf-8', errors='replace').lower()
+        patterns = {
+            'permission-denied': r'permission denied|eacces|operation not permitted|eperm',
+            'memory-or-process-limit': r'out of memory|heap limit|eagain|resource temporarily unavailable|sigkill|killed',
+            'missing-module': r'module not found|cannot find module|cannot resolve|can.t resolve',
+            'font-error': r'font.*(?:error|failed|unable)|(?:error|failed|unable).*font|next/font',
+            'network-error': r'enotfound|econnrefused|network is unreachable|failed to fetch|error while requesting resource',
+            'turbopack-error': r'turbopack.*(?:error|failed)|turbopackinternalerror',
+            'typescript-error': r'type error|error ts\d+',
+            'prerender-error': r'prerender|error occurred prerendering|failed to collect page data',
+            'missing-test-data': r'missing.*(?:supabase|environment)|supabase.*required',
+            'missing-file': r'enoent|no such file or directory',
+            'invalid-font-response': r'mocked.*response|missing mocked response|font.*response',
+        }
+        return {'stage': self.stage, 'signals': [label for label, pattern in patterns.items() if re.search(pattern, text)]}
+
 def command(args, cwd=None, timeout=180, allowed=(0,)):
     with tempfile.TemporaryFile() as output, tempfile.TemporaryFile() as errors:
         child = subprocess.Popen(args, cwd=cwd, stdout=output, stderr=errors, shell=False)

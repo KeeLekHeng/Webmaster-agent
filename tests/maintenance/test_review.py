@@ -65,7 +65,7 @@ def test_font_fixture_is_local_and_rejects_unknown_font_hosts(tmp_path,monkeypat
     hashes=fixtures.font_fixture(tmp_path/'fonts')
     assert 'fonts.cjs' in hashes
     module=(tmp_path/'fonts'/'fonts.cjs').read_text()
-    assert '/fixtures/' in module and 'fonts.gstatic.com/font.woff2' not in module
+    assert 'http://127.0.0.1:37913/' in module and 'fonts.gstatic.com/font.woff2' not in module
 
 
 def test_original_content_reads_commit_tree_then_regular_blobs():

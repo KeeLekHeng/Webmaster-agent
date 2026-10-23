@@ -3,7 +3,7 @@ import argparse
 import json
 import tempfile
 from pathlib import Path
-from sandbox import Sandbox, export
+from sandbox import Sandbox, CheckFailure, export
 from font_fixtures import font_fixture
 from policy import STAGES
 
@@ -32,6 +32,8 @@ def main():
             report['status'] = 'verified'
     except Exception as exc:
         report['failure_kind'] = type(exc).__name__
+        if isinstance(exc, CheckFailure):
+            report['diagnostics'] = exc.diagnostics()
     Path(args.output).write_text(json.dumps(report, indent=2), encoding='utf-8')
     print(json.dumps({'status': report['status'], 'stages': report['stages']}))
     return 0 if report['status'] == 'verified' else 1

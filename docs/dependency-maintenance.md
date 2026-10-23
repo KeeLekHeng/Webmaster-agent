@@ -85,8 +85,12 @@ Native packages requiring install scripts need an explicit future reviewed polic
 the controller does not turn scripts on to make a failing build pass.
 
 Current SIS supports synthetic public data, local mock authentication and PGlite
-tests. Google font files are fetched from fixed public hosts before test execution;
-Next's font test hook serves cached files inside the container. Unsupported font
+tests. Google font files are fetched from fixed public hosts before test execution.
+Next's font test hook receives an explicit serializable URL-to-CSS map; a small
+trusted server supplies only hashed cached font files over container loopback
+during the unchanged `pnpm run build` command. No host port is published and test
+egress remains blocked. A Proxy-only map is incompatible with Turbopack's JSON
+evaluation, so it is not used. Unsupported font
 hooks/toolchain changes fail the baseline instead of silently permitting egress.
 The pinned Playwright toolchain must be reviewed when browser revisions change.
 
@@ -111,6 +115,8 @@ the owner still needs to review checks and code before merging.
 
 Artifacts stay private in Actions for 30 days. Full package/test output is withheld
 from model inputs and automatic logs; phase statuses and safe failure types remain.
+Command failures also record the failed stage and fixed diagnostic labels (for
+example font/module/resource-limit signals), never raw source or error prose.
 `guardian dependency-review --input verification.json --llm claude` can generate a
 saved evidence-backed review; importing JSON never grants publishing authority.
 

@@ -6,7 +6,7 @@ case "${1:?stage}" in
   lint) pnpm run lint ;;
   typecheck) pnpm run typecheck ;;
   unit) node --experimental-strip-types --test tests/unit/*.test.mjs ;;
-  build) pnpm run build ;;
+  build) node /trusted/build.cjs ;;
   integration) node --experimental-strip-types --test --test-concurrency=1 tests/integration/*.test.mjs ;;
   browser) pnpm exec playwright test --workers=2 ;;
   *) exit 2 ;;

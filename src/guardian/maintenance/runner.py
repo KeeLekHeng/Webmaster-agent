@@ -138,6 +138,8 @@ def run(repository, output, image, *, sandbox_factory=Sandbox, registry=metadata
         # Do not publish arbitrary registry/package/test output or credentials.
         report['status'] = 'blocked'
         report['failure_kind'] = type(exc).__name__
+        if isinstance(exc, CheckFailure):
+            report['diagnostics'] = exc.diagnostics()
     finally:
         report['finished_at'] = datetime.now(timezone.utc).isoformat()
         (output / 'verification.json').write_text(json.dumps(report, indent=2), encoding='utf-8')

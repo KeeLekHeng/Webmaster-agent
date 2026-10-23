@@ -31,9 +31,10 @@ def font_fixture(directory):
                 raise ValueError('Unknown public font format')
             name = hashlib.sha256(font.content).hexdigest() + suffix
             (directory / name).write_bytes(font.content)
-            css = css.replace(url, '/fixtures/' + name)
+            css = css.replace(url, 'http://127.0.0.1:37913/' + name)
     # Next's explicit Google-font test hook. This fixture never changes SIS source.
-    module = ('const css=' + json.dumps(css) + '; module.exports=new Proxy({}, {get:(_,url)=>'
-              'typeof url==="string" && url.startsWith("https://fonts.googleapis.com/css2?family=Overpass:") ? css : undefined});\n')
+    # Turbopack serializes the module into a map: a Proxy with no own keys becomes {}.
+    # Unknown font requests must fail rather than silently matching every URL.
+    module = 'module.exports=' + json.dumps({CSS_URL: css}) + ';\n'
     (directory / 'fonts.cjs').write_text(module, encoding='utf-8')
     return {p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in directory.iterdir()}
