@@ -6,7 +6,7 @@ production changes, deletion, new credentials or additional scheduled jobs.
 
 | Rank | Work | Status / completion evidence |
 | --- | --- | --- |
-| 1 | Trial verified dependency maintenance and richer AI review | SIS CI bootstrap merged. Font correction passed real install/lint/types/unit/build/integration; browser verification blocked. [CI correction PR #4](https://github.com/KeeLekHeng/sisweb/pull/4) adds diagnostics/fail-fast retest. Guardian Actions secrets and dependency trial pending. [Setup](docs/dependency-maintenance-setup.md) |
+| 1 | Complete a realistic isolated SIS test backend, then trial dependency maintenance | Startup/isolation controls passed. Full run 41038473256 passed real backend/MFA and checks through integration; browser: 307 passed, one reduced-motion video-keyboard failure. Diagnostic rerun in progress. Passing baseline, owner SIS review, scoped read token and paired dependency trial remain pending. [CI PR #4](https://github.com/KeeLekHeng/sisweb/pull/4), [setup](docs/dependency-maintenance-setup.md) |
 | 2 | Verify the first automatic weekly digest and missed-run behavior | Pending Monday execution; inspect task results, stage records and owner delivery |
 | 3 | Deploy and trial manual retention | Preview/apply implemented and tested locally: 90-day eligible detail, 13 months numeric observations; protected references and offline checks. VPS upgrade pending; no automatic deletion enabled. [Operations](docs/retention.md) |
 | 4 | Improve speed comparison coverage | Evaluate sample frequency; current weekly sampling is below the stronger regression threshold |

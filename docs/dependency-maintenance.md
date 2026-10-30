@@ -73,9 +73,16 @@ on the shared website/Guardian VPS. Containers have a read-only root, limited
 CPU/memory/processes, dropped capabilities, no Docker socket, no host ports or
 production environment, and only their disposable work directory is writable.
 
+Trusted backend services first bootstrap on a loopback-bound bridge, then move to
+a fresh internal network with all bootstrap attachments removed and aliases kept.
+Mount/network/port audits, quotas and a blocked-egress probe must pass before any
+website SQL or code executes. Host-side setup uses the gateway IP discovered and
+validated against the owned private subnet. This avoids relying on published
+ports after isolation and grants no website code a bootstrap-network phase.
+
 Install/audit may contact public registries with no credentials; project scripts
-and pnpm hooks are disabled for installation. All executable test/build stages use
-network-none with loopback available for local synthetic services. No arbitrary
+and pnpm hooks are disabled for installation. Executable test/build stages use
+a private internal Docker network with real disposable backend services. No arbitrary
 commands come from the model or registry metadata. Timed-out containers are removed.
 
 The baseline and candidate use the same image ID and cached public font fixtures.
@@ -84,8 +91,14 @@ integration tests and Playwright. Missing checks and baseline failures block PRs
 Native packages requiring install scripts need an explicit future reviewed policy;
 the controller does not turn scripts on to make a failing build pass.
 
-Current SIS supports synthetic public data, local mock authentication and PGlite
-tests. Google font files are fetched from fixed public hosts before test execution.
+The new verifier starts a fresh Supabase stack for each baseline/candidate, applies
+bounded repository migrations and seeds test content/accounts. Broad browser/build
+checks use `E2E_TEST_DATA=0`; existing mocked unit/integration failure cases remain.
+Real database access policies, password authentication, Storage and browser MFA
+must pass. Only disposable signing/API keys enter application containers. See
+[backend operations and evidence](dependency-maintenance-setup.md#disposable-backend).
+Google font files are
+fetched from fixed public hosts before test execution.
 Next's font test hook receives an explicit serializable URL-to-CSS map; a small
 trusted server supplies only hashed cached font files over container loopback
 during the unchanged `pnpm run build` command. No host port is published and test
@@ -94,7 +107,7 @@ evaluation, so it is not used. Unsupported font
 hooks/toolchain changes fail the baseline instead of silently permitting egress.
 The pinned Playwright toolchain must be reviewed when browser revisions change.
 
-Passing checks establishes covered synthetic behavior, not all live Supabase,
+Passing checks establishes covered local-service behavior, not all hosted Supabase,
 mail, authentication-provider, customer-data or production-load behavior.
 
 ## Publishing and evidence
@@ -117,6 +130,9 @@ Artifacts stay private in Actions for 30 days. Full package/test output is withh
 from model inputs and automatic logs; phase statuses and safe failure types remain.
 Command failures also record the failed stage and fixed diagnostic labels (for
 example font/module/resource-limit signals), never raw source or error prose.
+Browser failures include bounded Playwright counts and failed source file/line
+locations. Page contents, credentials, test titles and raw error messages are
+excluded from this diagnostic summary.
 `guardian dependency-review --input verification.json --llm claude` can generate a
 saved evidence-backed review; importing JSON never grants publishing authority.
 
@@ -153,8 +169,36 @@ semantic behavior; these recipes do not guarantee correct migration logic.
 
 ## Current rollout status
 
-Implementation, actual parser tests and mocked orchestration tests are local work.
-SIS CI setup is prepared separately. The shared VPS and SIS
-production have not been modified by this feature. A real Actions trial, provider
-credentials and owner activation are still required. Do not claim a successful
-dependency build or PR from mocked tests alone.
+The real-service verifier is implemented locally and vendored into
+[SIS CI setup PR #4](https://github.com/KeeLekHeng/sisweb/pull/4). This is a separate
+human-reviewed CI change; automated dependency repairs still cannot modify tests,
+configuration, backend or authentication code. No production/VPS changes occurred.
+
+Controlled runs isolated the startup issue before introducing website input:
+[standard startup/SQL passed](https://github.com/KeeLekHeng/sisweb/actions/runs/41028651056),
+[internal-from-start failed](https://github.com/KeeLekHeng/sisweb/actions/runs/41031839505),
+and [bootstrap-to-internal passed](https://github.com/KeeLekHeng/sisweb/actions/runs/41031844785).
+The verifier now uses that proven transition with its original isolation gates.
+
+[Full run 41038473256](https://github.com/KeeLekHeng/sisweb/actions/runs/41038473256)
+passed install, lint, types, unit, build, integration, real schema/RLS/Auth/Storage,
+public-signup denial, browser MFA, isolation, egress and cleanup. Broader browser
+coverage recorded 307 passing tests and one reduced-motion Will Writing keyboard
+video failure; 88 tests were skipped or unexecuted after fail-fast. This is a
+blocked baseline, not successful dependency-upgrade evidence. The next exact-head
+run retains bounded structured assertion locations without exposing page data.
+
+PR #4 includes 34 Linux screenshot references captured from approved SIS main
+`11a2d83082b16c5d5eb659d0d22db3a79842609a` using the pinned image/fonts. Existing
+Windows references and thresholds are unchanged. The original contact test was
+independently reproduced on main, then corrected to open the real WhatsApp panel
+before checking its links; original assertions remain. Owner review is required.
+Normal verification cannot create or update screenshot references.
+
+Local controller regression passed 420 tests with two Windows skips, including
+the final diagnostic addition; its focused redaction tests also pass. These
+local tests do not replace a successful real Actions baseline/candidate trial.
+That trial also needs a scoped SIS read-token secret in Guardian Actions. PR
+publishing needs its separate writer and explicit activation; neither is assumed
+configured. Owner merge of the reviewed SIS setup remains a prerequisite for
+ordinary PR-event verification to use the new base-branch assets.

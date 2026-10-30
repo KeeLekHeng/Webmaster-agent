@@ -108,7 +108,7 @@ def publish(directory, expected, api, *, enabled=False, run_url='', replayer=rep
     if len(raw) > 2 * 1024 * 1024 or digest(raw) != expected:
         raise ValueError('Verification does not match the trusted job output')
     report = json.loads(raw)
-    verification(report)
+    verification(report, require_backend=True)
     names = set(report.get('files', {}))
     source_names = names - set(FILES)
     if (report.get('status') != 'verified' or not set(FILES).issubset(names) or len(source_names)>3
@@ -181,7 +181,8 @@ def publish(directory, expected, api, *, enabled=False, run_url='', replayer=rep
               'Tested base: ' + base,
               f"Reported advisory inventory: {len(report['advisories_before'])} before, {len(report['advisories_after'])} after.",
               'Known reported advisories were not introduced or increased in severity. Existing advisories may remain.',
-              'Tests ran with synthetic data, mocked external services and cached Google Fonts; live provider behavior is not verified.',
+              'Real isolated Postgres, Auth, Storage, RLS and password/MFA browser checks passed for both copies, with synthetic data.',
+              'Targeted failure mocks, intercepted email and cached fonts remain. Legacy password-only admin suites and live provider delivery are outside this proof.',
               'Owner review, merge and deployment are required. If main changes after this run, rerun verification before merge. No auto-merge or production action was requested.']
     if re.fullmatch(r'https://github.com/KeeLekHeng/Webmaster-agent/actions/runs/\d+', run_url):
         lines += ['', 'Verification run: ' + run_url]

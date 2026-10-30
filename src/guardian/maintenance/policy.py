@@ -140,12 +140,39 @@ def select(specification, metadata, urgent=False, now=None, installed=None):
     return max(candidates)[1] if candidates else specification
 
 
-def verification(report):
-    if report.get('version') != 1 or not re.fullmatch(r'[a-f0-9]{40}', report.get('base_sha', '')):
+def backend_verification(proof):
+    if not isinstance(proof,dict) or proof.get('mode')!='real' or proof.get('cli_version')!='2.119.0' or proof.get('postgres_major')!=17:
+        raise ValueError('Real backend identity missing')
+    for name in ('schema','rls','auth','storage','mfa_browser','isolation','egress_probe','cleanup'):
+        if proof.get(name)!='passed':raise ValueError('Required real backend proof missing')
+    if proof.get('public_signup')!='denied':raise ValueError('Public signup denial proof missing')
+    images=proof.get('images',{})
+    if not isinstance(images,dict) or not {'db','auth','rest','storage','kong'}<=images.keys() or len(images)>12:
+        raise ValueError('Required backend images missing')
+    if any(not isinstance(k,str) or not re.fullmatch(r'[a-z_]+',k) or not isinstance(v,str) or not re.fullmatch(r'sha256:[a-f0-9]{64}',v) for k,v in images.items()):
+        raise ValueError('Invalid backend image identity')
+    migrations=proof.get('migrations',{})
+    if not isinstance(migrations,dict) or not 1<=len(migrations)<=100 or any(
+        not isinstance(k,str) or not re.fullmatch(r'[0-9]{12,14}_[a-z0-9_]+\.sql',k) or not isinstance(v,str) or not re.fullmatch(r'[a-f0-9]{64}',v) for k,v in migrations.items()):
+        raise ValueError('Migration proof missing')
+    seed=proof.get('seed_sha256')
+    if not isinstance(seed,str) or not re.fullmatch(r'[a-f0-9]{64}',seed):raise ValueError('Seed proof missing')
+    return True
+
+
+def verification(report, *, require_backend=False):
+    if report.get('version') not in (1,2) or not re.fullmatch(r'[a-f0-9]{40}', report.get('base_sha', '')):
         raise ValueError('Invalid verification identity')
     for kind in ('baseline', 'candidate'):
         if report.get(kind) != {stage: 'passed' for stage in STAGES}:
             raise ValueError('Every required baseline and candidate check must pass')
     if not report.get('updates') or report.get('security_not_worsened') is not True:
         raise ValueError('Candidate/security policy not satisfied')
+    if require_backend:
+        if report.get('version')!=2:raise ValueError('Old mock-only evidence cannot authorize publishing')
+        backend=report.get('backend',{})
+        if not isinstance(backend,dict) or set(backend)!={'baseline','candidate'}:raise ValueError('Paired real backend proof required')
+        for proof in backend.values():backend_verification(proof)
+        for field in ('images','migrations','seed_sha256'):
+            if backend['baseline'][field]!=backend['candidate'][field]:raise ValueError('Paired backend inputs differ')
     return True

@@ -40,6 +40,8 @@ jobs:
           python -m pip install --no-deps -e .
       - name: Build isolated toolchain
         run: docker build --iidfile /tmp/guardian-image-id -f maintenance/Dockerfile maintenance
+      - name: Install reviewed backend CLI
+        run: python maintenance/install-backend-cli.py --directory "$RUNNER_TEMP/guardian-cli"
       - name: Install trusted repair parser
         if: vars.GUARDIAN_COMPAT_REPAIRS_ENABLED == 'true'
         run: npm install --prefix "$RUNNER_TEMP/guardian-parser" --ignore-scripts --no-package-lock typescript@6.0.3
@@ -51,6 +53,9 @@ jobs:
           GUARDIAN_TYPESCRIPT_PATH: ${{ runner.temp }}/guardian-parser/node_modules/typescript
         run: |
           python -m guardian.maintenance.runner --repository .sis-checkout --output maintenance-artifact --image "$(cat /tmp/guardian-image-id)"
+      - name: Clean only this run's disposable backend resources
+        if: always()
+        run: python -m guardian.maintenance.backend --cleanup-owned
       - name: Bind verified result
         id: result
         run: |

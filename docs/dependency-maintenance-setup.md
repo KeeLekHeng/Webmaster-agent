@@ -76,8 +76,10 @@ Eligible private display-component source is sent to Claude for this feature;
 leave it false if source sharing is not desired. See the architecture scope rules.
 PRs can then include mechanical component repairs as well as the two package files.
 
-Review and merge the separate SIS CI setup branch `guardian/setup-pr-verification`
-in **KeeLekHeng/sisweb**. Its initial run deliberately fails if the base branch
+The initial SIS CI setup was merged. Its follow-up [PR #4](https://github.com/KeeLekHeng/sisweb/pull/4)
+on `guardian/diagnose-sandbox-build` carries verifier corrections and the backend
+extension. Review the final changes before merging in **KeeLekHeng/sisweb**.
+Its initial run deliberately fails if the base branch
 does not yet contain the reviewed verifier. That bootstrap failure is expected;
 review the setup files before merging, then manually run **SIS isolated PR
 verification** on main to establish the first real pass. Subsequent SIS PRs use
@@ -88,6 +90,91 @@ unavailable, inspect both repositories' successful checks before merging an upgr
 The SIS assets are vendored from Guardian's `maintenance/` and maintenance Python
 modules. Changes to the trusted verifier need a separate reviewed SIS setup PR;
 dependency automation cannot update CI assets. No automatic deployment is included.
+
+## Disposable backend
+
+Basic startup passed in [control run 41028651056](https://github.com/KeeLekHeng/sisweb/actions/runs/41028651056).
+Use the SIS workflow's manual **check: backend-startup** option to diagnose the
+networking restriction before another full website run. This
+separate control starts only trusted service images on a standard bridge with
+loopback bindings, performs a real temporary-table write/read and cleans up.
+It receives no SIS source/migrations or production credentials, and its
+`backend-startup-only` artifact cannot authorize dependency publishing. A pass
+proves basic startup only. Step 2 must separately prove restricted networking and
+resource limits before candidate code is introduced; the main verifier's existing
+isolation requirements remain in force.
+
+`startup_network=bridge` establishes the standard control; `internal` attempts
+the same startup directly on an internal network. `transition` starts trusted
+services on the control network, moves them to a fresh internal network while
+preserving DNS aliases, removes all bootstrap attachments, applies the existing
+service audits/quotas, checks blocked egress and repeats the real SQL probe.
+Every mode remains diagnostic-only and requires successful cleanup.
+
+The controlled comparison is complete: internal-from-start trial
+[41031839505](https://github.com/KeeLekHeng/sisweb/actions/runs/41031839505) failed
+before website input, while transition trial
+[41031844785](https://github.com/KeeLekHeng/sisweb/actions/runs/41031844785) passed
+isolation, quotas, blocked egress, real SQL and cleanup. The full verifier now uses
+that sequence. Its host-side setup discovers the private gateway address from
+Docker inspection and verifies that it belongs to the owned network's subnet.
+
+Prerequisites: read the [isolation policy](dependency-maintenance.md#isolation-and-verification)
+and [security rights](TECHNICAL_GUIDE.md#security-and-decision-rights). This feature
+runs on a disposable Linux amd64 Actions runner with Docker and at least 6 GiB RAM.
+The shared VPS and ordinary Windows listener are unsuitable for this verifier.
+
+The trusted installer verifies the pinned Supabase CLI 2.119.0 archive SHA256.
+Trusted configuration disables candidate hooks, automatic seeds/migrations and
+external providers. Each source copy gets a unique private network and fresh
+database, Auth and Storage. Before repository SQL runs, the controller audits
+ownership, mounts, ports and networking, applies quotas and probes blocked egress.
+Only loopback backend ports are permitted. Application containers receive no
+production credentials, repository tokens or Docker socket.
+
+Repository migrations execute inside the disposable database. A literal-only
+parser reads public fixture content inside Docker; it never imports website code
+on the host. Synthetic career records and a test administrator support real
+application queries, password login, MFA and management-page checks. Test keys,
+passwords and MFA material are not saved in reports. Existing password-only legacy
+admin tests remain outside coverage unless compatible with MFA; provider/email
+delivery remains intercepted or outside scope.
+
+The email/password provider is enabled while global public signup remains off.
+The verifier creates its synthetic administrator through the local admin API and
+requires a real public-signup denial before password/MFA verification. PostgREST
+receives its documented SIGUSR1 schema-cache reload after migrations. The literal
+fixture parser is installed at an explicit image prefix and verified during the
+image build; it does not assume a host/global npm installation path.
+
+The trusted Playwright configuration preserves the website's test suite/projects
+but directly launches Next with real mode. The repository's usual E2E launcher
+forces mock mode and is unsuitable here. Automatic failure screenshots, traces and
+videos are disabled; the required authentication probe captures no images.
+
+The repository initially has Windows screenshot references only. The manual
+**check: visual-baseline** mode checks out approved SIS main, builds it using the
+same pinned image/fonts and real backend, and prepares Linux references for owner
+review. Its private artifact cannot authorize publishing. It also reproduces the
+existing contact assertion independently of candidate changes. Normal verification
+uses `--update-snapshots=none`: missing or changed references fail rather than
+rewriting expected output. Reference images belong to the separately reviewed CI
+setup PR; automatic dependency PRs cannot modify tests or reference images.
+
+Version 2 evidence must include successful schema, access-policy, Auth, Storage,
+MFA, isolation, egress and cleanup checks. Publishing requires paired baseline and
+candidate proofs with matching backend images, migration hashes and seed hashes.
+Historical version 1 reports remain readable but cannot authorize new publishing.
+
+Cleanup runs on normal exit, failure and an always-run workflow step. It targets
+only this run's labelled disposable resources; it never globally prunes Docker.
+Cleanup failure blocks verification. Cancelling a hosted runner may bypass cleanup;
+GitHub disposes the runner. Never run this cleanup against a production Docker host.
+
+The SIS PR workflow deliberately loads verifier assets from its reviewed base.
+Testing a changed verifier before merging therefore needs an explicit manual run
+on the setup branch. An ordinary PR check may still use the older base verifier.
+Inspect the run's event, ref and tested SHA before interpreting its result.
 
 ## Stop, troubleshoot and recover
 

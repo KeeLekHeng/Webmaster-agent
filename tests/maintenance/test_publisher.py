@@ -2,6 +2,7 @@ import json
 import pytest
 from guardian.maintenance.policy import STAGES, changes, digest
 from guardian.maintenance.publisher import publish, GitHub
+from tests.maintenance.backend_helpers import backend_proof
 
 
 class API:
@@ -26,7 +27,7 @@ def artifact(tmp_path):
     new = {**old, 'dependencies':{'example':'1.0.1'}}
     original = {'package.json':json.dumps(old).encode(), 'pnpm-lock.yaml':b'old lock\n'}
     candidate = {'package.json':json.dumps(new).encode(),'pnpm-lock.yaml':b'new lock\n'}
-    report = {'version':1,'base_sha':'a'*40,'status':'verified','security_not_worsened':True,
+    report = {'version':2,'backend':{k:backend_proof() for k in ('baseline','candidate')},'base_sha':'a'*40,'status':'verified','security_not_worsened':True,
               'advisories_before':[],'advisories_after':[],
               'baseline':{s:'passed' for s in STAGES},'candidate':{s:'passed' for s in STAGES},
               'updates':changes(original['package.json'],candidate['package.json']),
@@ -90,3 +91,15 @@ def test_base_moves_during_publication_no_branch_is_created(artifact):
     with pytest.raises(ValueError,match='Base changed'):
         publish(path,fingerprint(path),api,enabled=True)
     assert not any(p in {'/git/refs','/pulls'} and method=='POST' for method,p,_ in api.calls)
+
+
+@pytest.mark.parametrize('kind',['old-version','missing-backend','cleanup-failed','input-mismatch'])
+def test_incomplete_real_backend_evidence_never_writes(artifact,kind):
+    path,api,report=artifact
+    if kind=='old-version':report['version']=1
+    if kind=='missing-backend':report.pop('backend')
+    if kind=='cleanup-failed':report['backend']['candidate']['cleanup']='failed'
+    if kind=='input-mismatch':report['backend']['candidate']['seed_sha256']='d'*64
+    (path/'verification.json').write_text(json.dumps(report))
+    with pytest.raises(ValueError):publish(path,fingerprint(path),api,enabled=True)
+    assert not any(method=='POST' for method,_,_ in api.calls)

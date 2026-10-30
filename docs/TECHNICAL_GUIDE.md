@@ -591,7 +591,7 @@ explicit credential/report isolation before onboarding.
 | Owner follow-ups | Query actions, paired Telegram, reconciliation and weekly local scheduling |
 | Milestone 6 | Dedicated Guardian VPS remains pending |
 
-Latest suite: 271 passed, one Windows symlink-creation skip for missing privileges.
+22 October suite: 271 passed, one Windows symlink-creation skip for missing privileges.
 Coverage includes scope/redirect/SSRF, injection/citation rejection, duplicates,
 partial/unreachable APIs, retries, approval expiry/revocation, query minimization,
 unknown previous rows, reconciliation and weekly claims. These are Guardian tests,

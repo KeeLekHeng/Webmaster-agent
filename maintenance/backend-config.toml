@@ -1,0 +1,43 @@
+# Trusted minimal disposable stack. Candidate config/env/hooks are never loaded.
+project_id = "GUARDIAN_PROJECT"
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "storage", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+[db]
+port = 54322
+shadow_port = 54320
+major_version = 17
+[db.migrations]
+enabled = false
+[db.seed]
+enabled = false
+[realtime]
+enabled = false
+[studio]
+enabled = false
+[storage]
+enabled = true
+file_size_limit = "5MiB"
+[auth]
+enabled = true
+site_url = "http://localhost:3100"
+additional_redirect_urls = ["http://localhost:3100"]
+jwt_expiry = 3600
+enable_signup = false
+[auth.email]
+# Enables the password provider; auth.enable_signup above still blocks registration.
+enable_signup = true
+enable_confirmations = false
+[auth.mfa.totp]
+enroll_enabled = true
+verify_enabled = true
+[local_smtp]
+enabled = true
+port = 54324
+[edge_runtime]
+enabled = false
+[analytics]
+enabled = false

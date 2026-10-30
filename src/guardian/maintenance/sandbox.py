@@ -40,10 +40,20 @@ class CheckFailure(ValueError):
             'browser-timeout': r'test timeout|timeout .*exceeded|timed out',
             'browser-launch-error': r'browser.*closed|browser.*launch|executable doesn.t exist|pthread_create',
             'test-assertion': r'expect\(|assertionerror|expect.*received',
+            'assertion-url': r'tohaveurl',
+            'assertion-visibility': r'tobevisible|tobehidden',
+            'assertion-text': r'tohavetext|tocontaintext',
+            'test-collection-error': r'did not expect test|more than one version of @playwright/test',
         }
-        locations = sorted(set(re.findall(r'tests/e2e/[a-z0-9_/-]+\.spec\.tsx?:\d+(?::\d+)?', text)))[:10]
-        return {'stage': self.stage, 'signals': [label for label, pattern in patterns.items() if re.search(pattern, text)],
-                'test_locations': locations}
+        locations = sorted(set(re.findall(r'tests/(?:e2e|unit|integration)/[a-z0-9_/-]+\.(?:spec|test)\.(?:tsx?|mjs):\d+(?::\d+)?', text)))[:10]
+        result = {'stage': self.stage, 'signals': [label for label, pattern in patterns.items() if re.search(pattern, text)],
+                  'test_locations': locations}
+        if hasattr(self, 'browser_summary'):
+            result['browser_summary'] = self.browser_summary
+        auth = re.search(r'guardian_real_auth_probe_failed:([a-z-]+)', text)
+        if auth and auth[1] in {'start','anonymous-redirect','password-login','mfa-enrollment','mfa-management-access','logout'}:
+            result['auth_probe_phase'] = auth[1]
+        return result
 
 
 class CheckTimeout(subprocess.TimeoutExpired):
@@ -73,7 +83,67 @@ class OutputBudgetFailure(CheckFailure):
         result['signals'].append('output-budget-exceeded')
         return result
 
-def command(args, cwd=None, timeout=180, allowed=(0,)):
+
+def browser_summary(workspace):
+    """Extract only bounded counts/source locations and fixed error categories."""
+    try:
+        path = workspace/'test-results'/'e2e-report.json'
+        if path.is_symlink() or path.parent.is_symlink() or path.stat().st_size>4*1024*1024:
+            raise ValueError('Unsafe report')
+        report = json.loads(path.read_bytes())
+        stats = {k:v for k,v in report.get('stats',{}).items()
+                 if k in {'expected','unexpected','flaky','skipped'} and type(v) is int and 0<=v<=100000}
+        failures = []
+        visited = 0
+        def visit(suites, depth=0):
+            nonlocal visited
+            if depth>10: raise ValueError('Report nesting limit')
+            for suite in suites:
+                visited+=1
+                if visited>10000: raise ValueError('Report suite limit')
+                for spec in suite.get('specs',[]):
+                    visited+=1
+                    if visited>10000: raise ValueError('Report test limit')
+                    for test in spec.get('tests',[])[:10]:
+                        if test.get('status')!='unexpected': continue
+                        file=spec.get('file','').removeprefix('/work/')
+                        if '/' not in file: file='tests/e2e/'+file
+                        if not re.fullmatch(r'tests/e2e/[A-Za-z0-9_/-]+\.spec\.tsx?',file): continue
+                        line=spec.get('line')
+                        if type(line) is not int or not 1<=line<=100000:continue
+                        messages=[]
+                        assertions=[]
+                        matchers=set()
+                        for result in test.get('results',[])[:5]:
+                            for error in result.get('errors',[])[:5]:
+                                value=error.get('message','')
+                                if isinstance(value,str):
+                                    messages.append(value[:10000])
+                                    matchers.update(name for name in ('toBeFocused','toBeVisible','toHaveCount','toHaveAttribute','toHaveScreenshot','toHaveURL') if name in value[:10000])
+                                location=error.get('location',{})
+                                if isinstance(location,dict):
+                                    source=location.get('file','')
+                                    row=location.get('line')
+                                    column=location.get('column')
+                                    if isinstance(source,str):source=source.removeprefix('/work/')
+                                    if isinstance(source,str) and re.fullmatch(r'tests/e2e/[A-Za-z0-9_/-]+\.spec\.tsx?',source) and type(row) is int and 1<=row<=100000 and type(column) is int and 1<=column<=100000:
+                                        assertions.append(f'{source}:{row}:{column}')
+                                stack=error.get('stack','')
+                                if isinstance(stack,str):
+                                    assertions.extend(re.findall(r'tests/e2e/[A-Za-z0-9_/-]+\.spec\.tsx?:\d+(?::\d+)?',stack[:20000]))
+                        failure={'file':file,'line':line,'signals':CheckFailure('\n'.join(messages).encode()).diagnostics()['signals']}
+                        if assertions:failure['assertion_locations']=sorted(set(assertions))[:5]
+                        if matchers:failure['matchers']=sorted(matchers)
+                        if test.get('projectName') in {'desktop-chromium','mobile-chromium','reduced-motion'}:
+                            failure['project']=test['projectName']
+                        if len(failures)<10:failures.append(failure)
+                visit(suite.get('suites',[]),depth+1)
+        visit(report.get('suites',[]))
+        return {'counts':stats,'failures':failures}
+    except Exception:
+        return {'status':'unavailable'}
+
+def command(args, cwd=None, timeout=180, allowed=(0,), env=None):
     with tempfile.TemporaryFile() as output, tempfile.TemporaryFile() as errors:
         def bounded_tail():
             result = b''
@@ -81,7 +151,7 @@ def command(args, cwd=None, timeout=180, allowed=(0,)):
                 stream.seek(max(0, os.fstat(stream.fileno()).st_size-32768))
                 result += stream.read(32768)
             return result
-        child = subprocess.Popen(args, cwd=cwd, stdout=output, stderr=errors, shell=False)
+        child = subprocess.Popen(args, cwd=cwd, stdout=output, stderr=errors, shell=False, env=env)
         deadline = time.monotonic() + timeout
         try:
             while child.poll() is None:
@@ -144,24 +214,30 @@ class Sandbox:
         if not re.fullmatch(r'sha256:[a-f0-9]{64}', image):
             raise ValueError('Use a locally built image ID, not a mutable name')
         self.image, self.fixtures, self.trusted = image, Path(fixtures).resolve(), Path(trusted).resolve()
+        self.backend = None
+        self.backend_evidence = {}
 
     def run(self, workspace, argv, *, network=False, allowed=(0,), timeout=900):
         # No inherited environment, token, home, Docker socket, host PID or ports.
         name = 'guardian-' + uuid.uuid4().hex
-        args = ['docker', 'run', '--name', name, '--rm', '--init', '--network', 'bridge' if network else 'none',
+        mode = 'bridge' if network else ('container:'+self.backend.gateway if self.backend else 'none')
+        args = ['docker', 'run', '--name', name, '--rm', '--init', '--network', mode,
                 '--user', f'{os.getuid()}:{os.getgid()}', '--cap-drop=ALL', '--security-opt=no-new-privileges',
-                '--pids-limit=256', '--memory=4g', '--memory-swap=4g', '--cpus=2', '--read-only',
+                '--pids-limit=256', '--memory=3g', '--memory-swap=3g', '--cpus=2', '--read-only',
                 '--tmpfs', '/tmp:rw,nosuid,nodev,mode=1777,size=1g', '--shm-size=256m',
                 '--mount', f'type=bind,src={Path(workspace).resolve()},dst=/work',
                 '--mount', f'type=bind,src={self.fixtures},dst=/fixtures,readonly',
                 '--mount', f'type=bind,src={self.trusted},dst=/trusted,readonly', '-w', '/work']
         environment = {'CI': 'true', 'HOME': '/tmp', 'NEXT_TELEMETRY_DISABLED': '1',
                        'PLAYWRIGHT_BROWSERS_PATH': '/ms-playwright', 'E2E_TEST_DATA': '1',
+                       'ADMIN_SESSION_SECRET': 'guardian-synthetic-session-key-not-for-production',
                        'NEXT_PUBLIC_SUPABASE_URL': 'http://127.0.0.1:54321',
                        'NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY': 'synthetic-public-key',
                        'NEXT_PUBLIC_SITE_URL': 'https://estateplanning.com.my',
                        'NEXT_FONT_GOOGLE_MOCKED_RESPONSES': '/fixtures/fonts.cjs',
                        'npm_config_ignore_pnpmfile': 'true', 'npm_config_registry': 'https://registry.npmjs.org'}
+        if self.backend and not network:
+            environment.update(self.backend.environment)
         for key, value in environment.items():
             args += ['-e', key + '=' + value]
         args += [self.image, *argv]
@@ -191,6 +267,20 @@ class Sandbox:
         return resolved
 
     def checks(self, workspace, result):
+        if __package__:
+            from .backend import Backend
+        else:
+            from backend import Backend
+        backend = Backend(self, Path(workspace))
+        try:
+            with backend:
+                self.backend = backend
+                self._checks(workspace, result)
+        finally:
+            self.backend = None
+            self.backend_evidence = backend.evidence
+
+    def _checks(self, workspace, result):
         def snapshot():
             result = {}
             for p in workspace.rglob('*'):
@@ -206,9 +296,21 @@ class Sandbox:
             for stage in STAGES[1:]:
                 print(json.dumps({'sandbox_stage': stage, 'status': 'running'}), flush=True)
                 try:
+                    if stage == 'browser' and self.backend:
+                        self.backend.evidence['phase']='mfa-browser'
+                        self.run(workspace, ['node', '/trusted/real-backend.cjs'], timeout=180)
+                        self.backend.evidence['mfa_browser'] = 'passed'
+                        self.backend.evidence['phase']='browser-suite'
                     self.run(workspace, ['bash', '/trusted/check.sh', stage], timeout=1200)
+                    if stage == 'browser' and self.backend:
+                        summary = browser_summary(workspace)
+                        if summary.get('counts',{}).get('expected',0)<1 or summary.get('counts',{}).get('unexpected',0)!=0:
+                            raise ValueError('Browser execution coverage is missing or failed')
+                        self.backend.evidence['browser_summary'] = summary
                 except (CheckFailure, CheckTimeout) as exc:
                     exc.stage = stage
+                    if stage == 'browser':
+                        exc.browser_summary = browser_summary(workspace)
                     raise
                 result[stage] = 'passed'
                 print(json.dumps({'sandbox_stage': stage, 'status': 'passed'}), flush=True)
