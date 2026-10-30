@@ -185,8 +185,18 @@ passed install, lint, types, unit, build, integration, real schema/RLS/Auth/Stor
 public-signup denial, browser MFA, isolation, egress and cleanup. Broader browser
 coverage recorded 307 passing tests and one reduced-motion Will Writing keyboard
 video failure; 88 tests were skipped or unexecuted after fail-fast. This is a
-blocked baseline, not successful dependency-upgrade evidence. The next exact-head
-run retains bounded structured assertion locations without exposing page data.
+blocked baseline, not successful dependency-upgrade evidence. The diagnostic exact-head
+run retained bounded structured assertion locations without exposing page data.
+
+Diagnostic run [41040081839](https://github.com/KeeLekHeng/sisweb/actions/runs/41040081839)
+confirmed the same failure at `will-writing.spec.ts:110` (`toBeFocused`). A read-only
+public-browser comparison found the global reduced-motion transition duration
+briefly keeps the iframe computed hidden when its existing focus effect runs.
+Disabling transitions on that iframe restored focus in the browser experiment.
+PR #4 includes the one-line CSS correction; the original keyboard assertion is
+unchanged. Exact-head full run
+[41041467795](https://github.com/KeeLekHeng/sisweb/actions/runs/41041467795) is pending;
+the experiment alone is not a passing baseline or dependency-upgrade proof.
 
 PR #4 includes 34 Linux screenshot references captured from approved SIS main
 `11a2d83082b16c5d5eb659d0d22db3a79842609a` using the pinned image/fonts. Existing

@@ -12,7 +12,8 @@
 - [x] Isolate networking/resource restrictions incrementally after basic startup.
 - [x] Test missing backend, unsafe SQL/config, leaked credentials, cleanup, isolation and stale proof boundaries.
 - [x] Run Guardian suite, syntax checks and strict OpenSpec validation.
-- [ ] Run real Actions trial; record actual outcomes and remaining blockers.
+- [x] Run real Actions trials; record actual outcomes and remaining blockers.
+- [ ] Obtain a fully passing SIS baseline and paired dependency-upgrade proof.
 - [ ] Owner reviews/merges SIS setup; enable dependency trial separately.
 
 ## Evidence and remaining blocker
@@ -23,8 +24,11 @@
   schema/RLS, password Auth, public-signup denial, Storage and browser MFA.
   Broader browser coverage: 307 passed, one reduced-motion Will Writing keyboard
   video failure, 88 skipped/unexecuted after fail-fast. The baseline stays blocked.
-- A diagnostic-only rerun retains structured assertion locations and fixed matcher
-  labels; it does not relax the browser test or any publishing gate.
+- Diagnostic rerun 41040081839 confirmed `will-writing.spec.ts:110` / `toBeFocused`.
+  Read-only public-browser tracing found the global reduced-motion transition
+  leaves the iframe computed hidden at focus time. A browser-only transition
+  override restored focus. One-line iframe CSS correction is in PR #4, with the
+  original keyboard assertion unchanged. Exact-head run 41041467795 is pending.
 - Local regression: 420 passed, two Windows skips, including the final diagnostic
   addition; focused diagnostic suite: 10 passed. Strict OpenSpec validation passed.
 - Assets are in SIS PR #4, including 34 Linux references captured from approved
