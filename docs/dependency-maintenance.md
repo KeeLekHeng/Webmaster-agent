@@ -250,6 +250,31 @@ It uses the scoped SIS reader but disables repairs, interpretation and publicati
 Both the workflow and publisher require exact `refs/heads/main` for publishing.
 The Node 24 action-pin refresh changes Actions' runtime, not the website runtime.
 
+Read-only [preview 41203746397](https://github.com/KeeLekHeng/Webmaster-agent/actions/runs/41203746397)
+tested controller `2435a95` against SIS `6d40faf`. It explicitly deferred
+Playwright 1.62.1 to 1.64.1 and selected the other 14 updates. Baseline passed all
+stages (307 expected browser passes, one retry/flaky pass, 88 disclosed skips).
+Candidate install/lint/types/unit/build/integration, both real admin profiles,
+isolation and cleanup passed. Browser execution then blocked on two accessibility
+assertions at `tests/e2e/search-discovery.spec.ts:158:7`, which expects zero Axe
+violations. Partial candidate counts were 68 expected, two unexpected and 326
+skipped after early termination; these are not complete-suite coverage.
+
+The Axe package also changed, but the bounded report lacks violation IDs and route
+identity, so it cannot establish whether a newer rule exposed an existing issue
+or another update introduced a regression. Add bounded diagnostic evidence before
+choosing a repair; do not weaken the assertion or claim the 14 upgrades verified.
+Existing advisories were unchanged. Interpretation/publication were skipped.
+[Guardian PR #2](https://github.com/KeeLekHeng/Webmaster-agent/pull/2) remains a
+draft with this blocker disclosed.
+
+The separate workflow-only [SIS PR #5](https://github.com/KeeLekHeng/sisweb/pull/5)
+passed [run 41203784493](https://github.com/KeeLekHeng/sisweb/actions/runs/41203784493)
+on head `3b0b9c2` / merge checkout `2544c47`: all stages, both real admin profiles,
+isolation/cleanup, 308 browser passes, zero failures/flaky cases and 88 skips.
+No Node 20 deprecation annotations appeared in either new run. SIS #5 is ready
+for owner review; no merge or deployment occurred.
+
 Maintenance remains enabled as configured while post-trial weekly/manual
 preference is pending. Publishing remains explicitly off; its separate writer
 and activation are only relevant after successful paired verification.
