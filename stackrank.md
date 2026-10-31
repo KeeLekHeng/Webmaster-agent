@@ -6,19 +6,21 @@ production changes, deletion, new credentials or additional scheduled jobs.
 
 | Rank | Work | Status / completion evidence |
 | --- | --- | --- |
-| 1 | Diagnose candidate accessibility failures with bounded rule/route evidence | [Preview 41203746397](https://github.com/KeeLekHeng/Webmaster-agent/actions/runs/41203746397) explicitly deferred Playwright and passed candidate integration/admin checks, then blocked the remaining 14-update batch on two zero-Axe-violations assertions. Exact rules/routes were not retained; don't attribute the cause or weaken tests. [Guardian #2](https://github.com/KeeLekHeng/Webmaster-agent/pull/2) remains draft; workflow-only [SIS #5](https://github.com/KeeLekHeng/sisweb/pull/5) passed all checks and is review-ready. Existing high zod/moderate minimatch advisories remain. Publishing stays off; weekly/manual preference is pending. [Evidence](docs/dependency-maintenance.md) |
-| 2 | Verify the first automatic weekly digest and missed-run behavior | Pending Monday execution; inspect task results, stage records and owner delivery |
-| 3 | Deploy and trial manual retention | Preview/apply implemented and tested locally: 90-day eligible detail, 13 months numeric observations; protected references and offline checks. VPS upgrade pending; no automatic deletion enabled. [Operations](docs/retention.md) |
-| 4 | Improve speed comparison coverage | Evaluate sample frequency; current weekly sampling is below the stronger regression threshold |
-| 5 | Corroborate SEO actions with scoped page/query evidence | Keep confidence explicit and content changes human-reviewed |
-| 6 | Move Guardian to a dedicated VPS | Temporary host cutover verified; owner confirmed bot reply. Keep reusable deployment sources and migrate fresh state later: [deployment guide](docs/vps.md) |
-| 7 | Split the technical guide into a routed context library | Planned; structure and acceptance criteria below |
-| 8 | Validate demand for a maintenance service | Before multi-tenancy, billing or dashboards |
+| 1 | Owner review/merge, fresh main trial, then publishing setup | [Guardian #2](https://github.com/KeeLekHeng/Webmaster-agent/pull/2) and [SIS #6](https://github.com/KeeLekHeng/sisweb/pull/6) are review-ready. [Paired preview](https://github.com/KeeLekHeng/Webmaster-agent/actions/runs/41207985799) verified the same 14 upgrades on repaired source `66c1f70`, with Playwright deferred and all gates retained. Baseline/candidate retries were 1/2; zero unexpected failures, 88 skips each. SIS #6's own CI passed 308 with no flakes. Publishing stays off; a fresh merged-main run and scoped writer setup are required. SIS #5 remains owner-deferred. Weekly/manual preference is pending. [Setup](docs/dependency-maintenance-setup.md) |
+| 2 | Resolve existing transitive security advisories | Verified batch leaves zod/high GHSA-mrhx-c7xc-m3w5 and minimatch/moderate GHSA-g3hv-75wg-m249 unchanged. Assess affected dependency paths and exposure, then prepare a separately verified fix; do not claim these resolved by the 14 upgrades. |
+| 3 | Stabilize intermittent responsive-layout tests | Paired preview retried `will-writing.spec.ts:34:7` and `search-discovery.spec.ts:160:77` in reduced-motion. Preserve overflow assertions; investigate layout/timing rather than adding skips or weakening expected values. |
+| 4 | Verify the first automatic weekly digest and missed-run behavior | Pending Monday execution; inspect task results, stage records and owner delivery |
+| 5 | Deploy and trial manual retention | Preview/apply implemented and tested locally: 90-day eligible detail, 13 months numeric observations; protected references and offline checks. VPS upgrade pending; no automatic deletion enabled. [Operations](docs/retention.md) |
+| 6 | Improve speed comparison coverage | Evaluate sample frequency; current weekly sampling is below the stronger regression threshold |
+| 7 | Corroborate SEO actions with scoped page/query evidence | Keep confidence explicit and content changes human-reviewed |
+| 8 | Move Guardian to a dedicated VPS | Temporary host cutover verified; owner confirmed bot reply. Keep reusable deployment sources and migrate fresh state later: [deployment guide](docs/vps.md) |
+| 9 | Split the technical guide into a routed context library | Planned; structure and acceptance criteria below |
+| 10 | Validate demand for a maintenance service | Before multi-tenancy, billing or dashboards |
 
-CI diagnostic follow-up: include retried/flaky test source locations in the bounded
-browser summary. The current report records their count but only lists unexpected
-failures, so main run 41180334440 cannot identify its retried case. Preserve raw
-message/session redaction and existing test assertions.
+Bounded flaky-location reporting is implemented on Guardian #2. Diagnostic run
+41205217410 identifies `tests/e2e/will-writing.spec.ts:34:7` in reduced-motion as
+its retried baseline assertion; investigate that intermittent responsive-layout
+check separately. This does not identify historical run 41180334440's retried case.
 
 ## Documentation library refactor
 

@@ -7,6 +7,17 @@ the Guardian workflow. Settings below belong to **KeeLekHeng/Webmaster-agent**.
 
 ## Review, merge and deploy
 
+The original backend setup (Guardian #1 / SIS #4) is merged. Current follow-up
+reviews are [Guardian #2](https://github.com/KeeLekHeng/Webmaster-agent/pull/2)
+and [SIS #6](https://github.com/KeeLekHeng/sisweb/pull/6). After reviewing their
+actual latest results and merging both, run a fresh paired trial against SIS main
+with publishing off: an unmerged-source preview cannot authorize publishing.
+SIS #5 is an independent Actions pin refresh; its owner-deferred merge is not
+required for the label repair. Deploy SIS runtime changes only through the owner's
+normal process. Guardian's Actions changes need no VPS package deployment.
+
+Original backend bootstrap procedure (completed; retained for context):
+
 1. Review [SIS PR #4](https://github.com/KeeLekHeng/sisweb/pull/4), including the
    Linux reference images and its successful manual full run at the exact head.
    Its PR-event bootstrap failure happens before website testing because the

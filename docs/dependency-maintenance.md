@@ -216,9 +216,9 @@ The pre-merge PR event stopped at the bootstrap guard because its reviewed base
 lacked four verifier assets. Post-merge [SIS main run 41180334440](https://github.com/KeeLekHeng/sisweb/actions/runs/41180334440)
 passed the guard, all seven stages, both admin profiles, isolation and cleanup.
 It recorded 307 expected browser passes, one flaky case that passed on retry and
-88 disclosed skips. The current summary lists unexpected failures only, so the
-retried case's identity is unavailable; safe flaky-location reporting is backlog
-work, not a zero-flake claim. No test gate was changed for this run.
+88 disclosed skips. That historical SIS summary omitted the retried case's
+identity. Later Guardian diagnostics retain retry locations but cannot reconstruct
+that old run. This is not a zero-flake claim; no gate changed for this run.
 
 The owner configured the scoped SIS reader and enabled verification. Guardian
 [trial 41191170056](https://github.com/KeeLekHeng/Webmaster-agent/actions/runs/41191170056)
@@ -260,27 +260,35 @@ assertions at `tests/e2e/search-discovery.spec.ts:158:7`, which expects zero Axe
 violations. Partial candidate counts were 68 expected, two unexpected and 326
 skipped after early termination; these are not complete-suite coverage.
 
-The Axe package also changed, but the bounded report lacks violation IDs and route
-identity, so it cannot establish whether a newer rule exposed an existing issue
-or another update introduced a regression. Add bounded diagnostic evidence before
-choosing a repair; do not weaken the assertion or claim the 14 upgrades verified.
-Existing advisories were unchanged. Interpretation/publication were skipped.
-[Guardian PR #2](https://github.com/KeeLekHeng/Webmaster-agent/pull/2) remains a
-draft with this blocker disclosed.
+[Diagnostic run 41205217410](https://github.com/KeeLekHeng/Webmaster-agent/actions/runs/41205217410)
+repeated the same 14 updates and identified `label-content-name-mismatch` on `/`
+and `/will-writing`. Axe 4.14 enables this rule by default. The shared brand link
+overrides its visible motto with `aria-label="SIS home"`. After removing it,
+run 41206017601 identified the same defect on the mobile video control, whose
+fixed name omitted its visible Watch/Loading text. The separate source repair
+[SIS #6](https://github.com/KeeLekHeng/sisweb/pull/6) removes the brand override and
+shares the video's state-derived display/ARIA label in `66c1f70`; its status child
+alone cannot name the button. The keyboard locator follows the visible name;
+its focus/Enter assertions remain. [Paired preview 41207985799](https://github.com/KeeLekHeng/Webmaster-agent/actions/runs/41207985799)
+passed all seven stages for both copies and validated artifact hashes: baseline
+307 direct passes plus one retry; candidate 306 plus two retries; each had 88 skips
+and zero unexpected failures. Both admin profiles, isolation and cleanup passed.
+[SIS CI 41207971207](https://github.com/KeeLekHeng/sisweb/actions/runs/41207971207)
+passed on `66c1f70` / merge `21913c4`: 308 passes, 88 skips, zero failures/flakes.
+[Guardian #2](https://github.com/KeeLekHeng/Webmaster-agent/pull/2) and SIS #6 are
+ready for owner review. Publishing remains off; fresh merged-main proof is required.
 
 The separate workflow-only [SIS PR #5](https://github.com/KeeLekHeng/sisweb/pull/5)
 passed [run 41203784493](https://github.com/KeeLekHeng/sisweb/actions/runs/41203784493)
 on head `3b0b9c2` / merge checkout `2544c47`: all stages, both real admin profiles,
 isolation/cleanup, 308 browser passes, zero failures/flaky cases and 88 skips.
-No Node 20 deprecation annotations appeared in either new run. SIS #5 is ready
-for owner review; no merge or deployment occurred.
+Its review/merge is owner-deferred. No merge or deployment occurred.
 
 The follow-up diagnostic summary recognizes the existing public-accessibility
 test title only for approved public routes, extracts Axe IDs from a reviewed
 Deque v4.14.0 rule vocabulary, and retains source/project locations for failed
 and flaky tests. Raw prose, HTML, selectors and unknown route/ID values are not
 retained. Parsing failure never changes a test outcome or grants publishing.
-The owner has deferred review/merge of SIS #5; diagnostic work does not require it.
 
 Maintenance remains enabled as configured while post-trial weekly/manual
 preference is pending. Publishing remains explicitly off; its separate writer
