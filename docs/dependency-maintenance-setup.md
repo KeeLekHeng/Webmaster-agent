@@ -218,6 +218,11 @@ previews: they cannot publish, invoke repair/interpretation models, or use the
 writer. Main retains its explicit activation flags. Inspect the selected ref,
 tested SHA and saved report; a green preview does not enable automatic publishing.
 
+The optional **preview_sis_sha** input accepts a full lowercase 40-character SIS
+commit SHA to test an unmerged repair. It is allowed only for manual non-main
+controller previews. Main and scheduled runs reject overrides; an empty input
+uses SIS `main`. Every stage still runs, without publishing or model access.
+
 Browser-package updates are reported as deferred to a separately reviewed
 toolchain change. Coordinate package/lock and reviewed image versions, run all
 checks, and explicitly review any visual-reference changes. Do not bypass the

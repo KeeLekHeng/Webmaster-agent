@@ -30,6 +30,11 @@ SHALL NOT expose writer/model secrets or authorize publishing, regardless of fla
 - **WHEN** verification runs from a non-main branch
 - **THEN** publishing and model jobs SHALL be skipped and eligible SHALL be false
 
+#### Scenario: Test an unmerged website repair
+- **WHEN** an owner manually previews a non-main controller with a full SIS commit SHA
+- **THEN** checkout SHALL use that exact SIS commit and publication SHALL remain disabled
+- **AND** main/scheduled runs and malformed refs SHALL reject the override before SIS checkout
+
 ### Requirement: Bounded browser diagnosis
 Browser summaries SHALL retain failed and retried source locations and recognized
 public accessibility routes/rule IDs without retaining arbitrary test prose,

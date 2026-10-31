@@ -2,6 +2,12 @@ name: Verified SIS dependency maintenance
 
 on:
   workflow_dispatch:
+    inputs:
+      preview_sis_sha:
+        description: Optional full SIS commit SHA (read-only non-main previews only)
+        required: false
+        default: ''
+        type: string
   schedule:
     - cron: '0 23 * * 0' # Monday 07:00 Malaysia; allow time before the Guardian digest.
 
@@ -26,27 +32,34 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          repository: KeeLekHeng/sisweb
-          ref: main
-          token: ${{ secrets.GUARDIAN_SIS_READ_TOKEN }}
-          path: .sis-checkout
-          persist-credentials: false
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: '3.12'
+      - name: Determine execution mode
+        id: mode
+        shell: python
+        env:
+          PREVIEW_SIS_SHA: ${{ inputs.preview_sis_sha }}
+        run: |
+          import os,re
+          trusted_main=os.environ['GITHUB_REF']=='refs/heads/main'
+          sha=os.getenv('PREVIEW_SIS_SHA','')
+          if sha and (trusted_main or os.getenv('GITHUB_EVENT_NAME')!='workflow_dispatch' or not re.fullmatch(r'[a-f0-9]{40}',sha)):
+              raise ValueError('SIS commit selection requires a read-only manual non-main preview and a full SHA')
+          with open(os.environ['GITHUB_OUTPUT'],'a') as output:
+              output.write('trusted_main='+str(trusted_main).lower()+'\n')
+              output.write('sis_ref='+(sha or 'main')+'\n')
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: KeeLekHeng/sisweb
+          ref: ${{ steps.mode.outputs.sis_ref }}
+          token: ${{ secrets.GUARDIAN_SIS_READ_TOKEN }}
+          path: .sis-checkout
+          persist-credentials: false
       - name: Install trusted controller
         run: |
           python -m pip install -r requirements-dev.lock
           python -m pip install --no-deps -e .
-      - name: Determine execution mode
-        id: mode
-        shell: python
-        run: |
-          import os
-          with open(os.environ['GITHUB_OUTPUT'],'a') as output:
-              output.write('trusted_main='+str(os.environ['GITHUB_REF']=='refs/heads/main').lower()+'\n')
       - name: Build isolated toolchain
         run: docker build --iidfile /tmp/guardian-image-id -f maintenance/Dockerfile maintenance
       - name: Install reviewed backend CLI

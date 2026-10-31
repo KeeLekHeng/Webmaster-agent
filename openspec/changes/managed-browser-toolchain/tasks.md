@@ -14,4 +14,5 @@ remains draft pending bounded accessibility diagnosis; no gate was removed.
 SIS workflow-only PR #5 passed run 41203784493 and is ready for owner review.
 
 - [x] Add bounded public accessibility rule/route and flaky-location diagnostics.
+- [x] Confine exact SIS commit selection to manual read-only non-main previews.
 - [ ] Rerun the unchanged batch and diagnose the accessibility failures.
