@@ -6,7 +6,7 @@ production changes, deletion, new credentials or additional scheduled jobs.
 
 | Rank | Work | Status / completion evidence |
 | --- | --- | --- |
-| 1 | Review CI setup and trial paired dependency maintenance | Full SIS run 41163143674 passed MFA-on and password-only UAT draft lifecycle, all stages and cleanup: 308 browser passes, zero failures/flaky tests, 88 disclosed skips. Guardian: 428 passed, two skips. Owner review/merge, scoped read token and paired dependency trial remain pending. [CI PR #4](https://github.com/KeeLekHeng/sisweb/pull/4), [setup](docs/dependency-maintenance-setup.md) |
+| 1 | Review CI setup and trial paired dependency maintenance | Full SIS run 41163143674 passed MFA-on and password-only UAT draft lifecycle, all stages and cleanup: 308 browser passes, zero failures/flaky tests, 88 disclosed skips. Guardian: 428 passed, two skips. Owner review/merge, scoped read token and paired dependency trial remain pending. [SIS PR #4](https://github.com/KeeLekHeng/sisweb/pull/4), [Guardian draft #1](https://github.com/KeeLekHeng/Webmaster-agent/pull/1), [setup](docs/dependency-maintenance-setup.md) |
 | 2 | Verify the first automatic weekly digest and missed-run behavior | Pending Monday execution; inspect task results, stage records and owner delivery |
 | 3 | Deploy and trial manual retention | Preview/apply implemented and tested locally: 90-day eligible detail, 13 months numeric observations; protected references and offline checks. VPS upgrade pending; no automatic deletion enabled. [Operations](docs/retention.md) |
 | 4 | Improve speed comparison coverage | Evaluate sample frequency; current weekly sampling is below the stronger regression threshold |

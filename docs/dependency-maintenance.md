@@ -174,7 +174,7 @@ semantic behavior; these recipes do not guarantee correct migration logic.
 
 ## Current rollout status
 
-The real-service verifier is implemented on Guardian's feature branch and vendored
+The real-service verifier is in [Guardian draft PR #1](https://github.com/KeeLekHeng/Webmaster-agent/pull/1) and vendored
 into [SIS CI setup PR #4](https://github.com/KeeLekHeng/sisweb/pull/4). This is a
 human-reviewed CI change; automatic dependency repairs cannot modify tests,
 configuration, backend or authentication code. No production/VPS changes occurred.
