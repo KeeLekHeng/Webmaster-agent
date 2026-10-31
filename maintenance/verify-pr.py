@@ -16,7 +16,7 @@ def main():
     args = parser.parse_args()
     report = {'version': 2, 'status': 'blocked', 'stages': {},
               'limits': ['Synthetic records and credentials; production integrations and delivery are unverified.',
-                         'Legacy password-only admin suites remain skipped; the separate real MFA probe is required.']}
+                         'Extensive legacy admin UI suites remain skipped; separate real MFA and UAT draft lifecycle probes are required.']}
     sandbox = None
     try:
         with tempfile.TemporaryDirectory(prefix='sis-pr-') as temporary:

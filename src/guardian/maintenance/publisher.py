@@ -181,8 +181,8 @@ def publish(directory, expected, api, *, enabled=False, run_url='', replayer=rep
               'Tested base: ' + base,
               f"Reported advisory inventory: {len(report['advisories_before'])} before, {len(report['advisories_after'])} after.",
               'Known reported advisories were not introduced or increased in severity. Existing advisories may remain.',
-              'Real isolated Postgres, Auth, Storage, RLS and password/MFA browser checks passed for both copies, with synthetic data.',
-              'Targeted failure mocks, intercepted email and cached fonts remain. Legacy password-only admin suites and live provider delivery are outside this proof.',
+              'Real isolated Postgres, Auth, Storage, RLS, MFA login and password-only UAT admin draft create/read/edit/delete/signout checks passed for both copies, with synthetic data.',
+              'Targeted failure mocks, intercepted email and cached fonts remain. The extensive legacy admin UI suites and live provider delivery are outside this proof.',
               'Owner review, merge and deployment are required. If main changes after this run, rerun verification before merge. No auto-merge or production action was requested.']
     if re.fullmatch(r'https://github.com/KeeLekHeng/Webmaster-agent/actions/runs/\d+', run_url):
         lines += ['', 'Verification run: ' + run_url]

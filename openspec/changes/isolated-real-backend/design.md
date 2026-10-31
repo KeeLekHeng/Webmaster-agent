@@ -50,6 +50,18 @@ Password-only legacy admin UI cases are not silently enabled by disabling MFA;
 report that coverage limit. Hosted OAuth/provider deliverability remains outside
 the local test proof.
 
+SIS documents `REQUIRE_ADMIN_MFA=false` for its current UAT period. A separate
+trusted browser smoke process tests that configuration with the same disposable
+backend and fresh browser context. It must reject anonymous access, sign in via
+the real password form, create/read/edit/delete a unique synthetic draft through
+the application, check persistence independently through local PostgREST, confirm
+anonymous draft denial and perform actual sign-out followed by protected-access
+rejection. Server restarts separate the MFA-on and UAT configurations. No session
+storage, production credentials, route interception or success stubs are used.
+Both profile proofs are mandatory; extensive legacy admin suites remain skipped
+and disclosed. This UAT profile does not change production or the broad suite's
+MFA-on policy. These are trusted CI setup changes, not automatic repair authority.
+
 ## Evidence and cleanup
 Store only versions/image identities, migration hashes, stage statuses and bounded
 browser summaries. Never store test passwords, API keys, MFA secrets, raw logs or

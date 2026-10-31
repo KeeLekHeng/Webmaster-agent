@@ -29,7 +29,7 @@ def test_migrations_are_data_and_hashes(tmp_path):
     assert len(result[0][2])==64
 
 
-@pytest.mark.parametrize('field', ['schema','rls','auth','storage','mfa_browser','isolation','egress_probe','cleanup'])
+@pytest.mark.parametrize('field', ['schema','rls','auth','storage','mfa_browser','uat_admin_browser','isolation','egress_probe','cleanup'])
 def test_every_real_gate_is_required(field):
     proof=backend_proof()
     proof[field]='failed'

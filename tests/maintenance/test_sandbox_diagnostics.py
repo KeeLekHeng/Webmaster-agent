@@ -76,7 +76,7 @@ def test_browser_gate_rejects_all_skipped_coverage(tmp_path,monkeypatch,passed):
     sandbox=Sandbox('sha256:'+'a'*64,tmp_path,tmp_path)
     sandbox.backend=SimpleNamespace(evidence={})
     monkeypatch.setattr(module,'STAGES',('install','browser'))
-    monkeypatch.setattr(sandbox,'run',lambda *args,**kwargs:b'')
+    monkeypatch.setattr(sandbox,'run',lambda *args,**kwargs:json.dumps({'real_password_mfa_browser':'passed','uat_admin_browser':'passed'}).encode())
     monkeypatch.setattr(module,'browser_summary',lambda workspace:{'counts':{'expected':passed,'unexpected':0,'skipped':10}})
     result={}
     if passed:
@@ -91,6 +91,26 @@ def test_browser_gate_rejects_all_skipped_coverage(tmp_path,monkeypatch,passed):
 def test_real_auth_failure_phase_is_fixed_and_redacted():
     result=CheckFailure(b'GUARDIAN_REAL_AUTH_PROBE_FAILED:mfa-enrollment private-value','browser').diagnostics()
     assert result['auth_probe_phase']=='mfa-enrollment'
+    assert 'private-value' not in json.dumps(result)
+
+
+@pytest.mark.parametrize('proof',[{}, {'real_password_mfa_browser':'passed'},
+    {'real_password_mfa_browser':'passed','uat_admin_browser':'skipped'},
+    {'real_password_mfa_browser':'passed','uat_admin_browser':'passed','extra':'private-value'}])
+def test_browser_gate_requires_both_real_admin_profiles(tmp_path,monkeypatch,proof):
+    from types import SimpleNamespace
+    import guardian.maintenance.sandbox as module
+    sandbox=Sandbox('sha256:'+'a'*64,tmp_path,tmp_path)
+    sandbox.backend=SimpleNamespace(evidence={})
+    monkeypatch.setattr(module,'STAGES',('install','browser'))
+    monkeypatch.setattr(sandbox,'run',lambda *args,**kwargs:json.dumps(proof).encode())
+    with pytest.raises(ValueError,match='Both real admin profiles'):sandbox._checks(tmp_path,{})
+    assert 'mfa_browser' not in sandbox.backend.evidence and 'uat_admin_browser' not in sandbox.backend.evidence
+
+
+def test_uat_failure_phase_does_not_expose_account_or_draft_contents():
+    result=CheckFailure(b'GUARDIAN_REAL_AUTH_PROBE_FAILED:uat-draft-update private-value','browser').diagnostics()
+    assert result['auth_probe_phase']=='uat-draft-update'
     assert 'private-value' not in json.dumps(result)
 
 

@@ -143,7 +143,7 @@ def select(specification, metadata, urgent=False, now=None, installed=None):
 def backend_verification(proof):
     if not isinstance(proof,dict) or proof.get('mode')!='real' or proof.get('cli_version')!='2.119.0' or proof.get('postgres_major')!=17:
         raise ValueError('Real backend identity missing')
-    for name in ('schema','rls','auth','storage','mfa_browser','isolation','egress_probe','cleanup'):
+    for name in ('schema','rls','auth','storage','mfa_browser','uat_admin_browser','isolation','egress_probe','cleanup'):
         if proof.get(name)!='passed':raise ValueError('Required real backend proof missing')
     if proof.get('public_signup')!='denied':raise ValueError('Public signup denial proof missing')
     images=proof.get('images',{})

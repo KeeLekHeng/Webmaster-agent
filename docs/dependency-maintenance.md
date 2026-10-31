@@ -95,7 +95,12 @@ The new verifier starts a fresh Supabase stack for each baseline/candidate, appl
 bounded repository migrations and seeds test content/accounts. Broad browser/build
 checks use `E2E_TEST_DATA=0`; existing mocked unit/integration failure cases remain.
 Real database access policies, password authentication, Storage and browser MFA
-must pass. Only disposable signing/API keys enter application containers. See
+must pass. A separate process also tests the documented password-only UAT mode:
+anonymous rejection, real admin draft creation/read/edit/deletion, independent
+database persistence, private-draft denial and actual sign-out. Neither profile
+uses success interception or saved sessions; both proofs are required. The broad
+browser suite retains its MFA-on configuration and disclosed legacy UI skips.
+Only disposable signing/API keys enter application containers. See
 [backend operations and evidence](dependency-maintenance-setup.md#disposable-backend).
 Google font files are
 fetched from fixed public hosts before test execution.
@@ -169,46 +174,42 @@ semantic behavior; these recipes do not guarantee correct migration logic.
 
 ## Current rollout status
 
-The real-service verifier is implemented locally and vendored into
-[SIS CI setup PR #4](https://github.com/KeeLekHeng/sisweb/pull/4). This is a separate
-human-reviewed CI change; automated dependency repairs still cannot modify tests,
+The real-service verifier is implemented on Guardian's feature branch and vendored
+into [SIS CI setup PR #4](https://github.com/KeeLekHeng/sisweb/pull/4). This is a
+human-reviewed CI change; automatic dependency repairs cannot modify tests,
 configuration, backend or authentication code. No production/VPS changes occurred.
 
-Controlled runs isolated the startup issue before introducing website input:
-[standard startup/SQL passed](https://github.com/KeeLekHeng/sisweb/actions/runs/41028651056),
-[internal-from-start failed](https://github.com/KeeLekHeng/sisweb/actions/runs/41031839505),
-and [bootstrap-to-internal passed](https://github.com/KeeLekHeng/sisweb/actions/runs/41031844785).
-The verifier now uses that proven transition with its original isolation gates.
+Controlled runs proved [standard startup/SQL](https://github.com/KeeLekHeng/sisweb/actions/runs/41028651056)
+and [bootstrap-to-internal isolation](https://github.com/KeeLekHeng/sisweb/actions/runs/41031844785).
+[Internal-from-start](https://github.com/KeeLekHeng/sisweb/actions/runs/41031839505)
+reproduced the original CLI startup failure before website input. The verifier
+uses the proven transition with its isolation gates intact.
 
-[Full run 41038473256](https://github.com/KeeLekHeng/sisweb/actions/runs/41038473256)
-passed install, lint, types, unit, build, integration, real schema/RLS/Auth/Storage,
-public-signup denial, browser MFA, isolation, egress and cleanup. Broader browser
-coverage recorded 307 passing tests and one reduced-motion Will Writing keyboard
-video failure; 88 tests were skipped or unexecuted after fail-fast. This is a
-blocked baseline, not successful dependency-upgrade evidence. The diagnostic exact-head
-run retained bounded structured assertion locations without exposing page data.
+[Full run 41041467795](https://github.com/KeeLekHeng/sisweb/actions/runs/41041467795)
+passed all seven stages, real schema/RLS/Auth/Storage, public-signup denial, MFA,
+isolation, egress and cleanup: 308 browser passes, zero failures/flaky tests,
+88 skips. Source review accounts for 51 authenticated legacy UI instances and
+37 intentional project/viewport skips. The iframe focus defect was corrected
+with one CSS declaration; the original keyboard assertion remains unchanged.
+The contact test now opens its real panel before checking links. PR #4 also has
+34 Linux screenshot references captured from approved main
+`11a2d83082b16c5d5eb659d0d22db3a79842609a`; owner review is required. Existing
+Windows references and thresholds are unchanged; normal runs cannot update them.
 
-Diagnostic run [41040081839](https://github.com/KeeLekHeng/sisweb/actions/runs/41040081839)
-confirmed the same failure at `will-writing.spec.ts:110` (`toBeFocused`). A read-only
-public-browser comparison found the global reduced-motion transition duration
-briefly keeps the iframe computed hidden when its existing focus effect runs.
-Disabling transitions on that iframe restored focus in the browser experiment.
-PR #4 includes the one-line CSS correction; the original keyboard assertion is
-unchanged. Exact-head full run
-[41041467795](https://github.com/KeeLekHeng/sisweb/actions/runs/41041467795) is pending;
-the experiment alone is not a passing baseline or dependency-upgrade proof.
+SIS explicitly documents `REQUIRE_ADMIN_MFA=false` for UAT in its README and
+admin-session guide. The owner approved a small real admin smoke test in that
+mode while retaining the separate MFA-on check and leaving the extensive legacy
+UI suite outside MVP coverage. Both profiles are now required by the controller
+and publisher. [Full run 41163143674](https://github.com/KeeLekHeng/sisweb/actions/runs/41163143674)
+passed both admin profiles, all seven stages and cleanup: 308 broad browser passes,
+zero failures/flaky tests, 88 disclosed skips. Guardian's local suite passed 428
+tests with two Windows skips. This is successful SIS verification, not yet paired
+dependency-upgrade proof.
 
-PR #4 includes 34 Linux screenshot references captured from approved SIS main
-`11a2d83082b16c5d5eb659d0d22db3a79842609a` using the pinned image/fonts. Existing
-Windows references and thresholds are unchanged. The original contact test was
-independently reproduced on main, then corrected to open the real WhatsApp panel
-before checking its links; original assertions remain. Owner review is required.
-Normal verification cannot create or update screenshot references.
-
-Local controller regression passed 420 tests with two Windows skips, including
-the final diagnostic addition; its focused redaction tests also pass. These
-local tests do not replace a successful real Actions baseline/candidate trial.
-That trial also needs a scoped SIS read-token secret in Guardian Actions. PR
-publishing needs its separate writer and explicit activation; neither is assumed
-configured. Owner merge of the reviewed SIS setup remains a prerequisite for
-ordinary PR-event verification to use the new base-branch assets.
+The PR-event check stops at the explicit bootstrap guard because the reviewed
+base does not yet contain four new verifier assets. This occurs before website
+installation/tests; it is distinct from the manual exact-head result. Initial
+setup still needs owner review/merge. A paired dependency-upgrade trial remains
+pending, needs a scoped SIS read-token secret in Guardian Actions, and must pass
+both copies before any dependency PR. Publishing needs its separate writer and
+explicit activation. Nothing here merges, deploys or activates the workflow.

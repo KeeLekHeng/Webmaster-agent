@@ -140,6 +140,15 @@ passwords and MFA material are not saved in reports. Existing password-only lega
 admin tests remain outside coverage unless compatible with MFA; provider/email
 delivery remains intercepted or outside scope.
 
+SIS documents password-only UAT with `REQUIRE_ADMIN_MFA=false`. The trusted probe
+starts a separate application process in that mode, uses a fresh browser context
+and generated account, checks anonymous rejection, creates/reads/edits/deletes a
+synthetic draft through real application APIs/editor reads, independently checks
+database persistence and private-draft denial, then signs out and verifies access
+is denied. No production password, session key or authenticator code is required.
+The MFA-on probe remains mandatory; broad browser mode and legacy skips are unchanged.
+The publisher rejects earlier evidence without `uat_admin_browser=passed`.
+
 The email/password provider is enabled while global public signup remains off.
 The verifier creates its synthetic administrator through the local admin API and
 requires a real public-signup denial before password/MFA verification. PostgREST
@@ -162,7 +171,7 @@ rewriting expected output. Reference images belong to the separately reviewed CI
 setup PR; automatic dependency PRs cannot modify tests or reference images.
 
 Version 2 evidence must include successful schema, access-policy, Auth, Storage,
-MFA, isolation, egress and cleanup checks. Publishing requires paired baseline and
+MFA, password-only UAT admin, isolation, egress and cleanup checks. Publishing requires paired baseline and
 candidate proofs with matching backend images, migration hashes and seed hashes.
 Historical version 1 reports remain readable but cannot authorize new publishing.
 

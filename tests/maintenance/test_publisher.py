@@ -93,13 +93,15 @@ def test_base_moves_during_publication_no_branch_is_created(artifact):
     assert not any(p in {'/git/refs','/pulls'} and method=='POST' for method,p,_ in api.calls)
 
 
-@pytest.mark.parametrize('kind',['old-version','missing-backend','cleanup-failed','input-mismatch'])
+@pytest.mark.parametrize('kind',['old-version','missing-backend','cleanup-failed','input-mismatch','missing-uat','skipped-uat'])
 def test_incomplete_real_backend_evidence_never_writes(artifact,kind):
     path,api,report=artifact
     if kind=='old-version':report['version']=1
     if kind=='missing-backend':report.pop('backend')
     if kind=='cleanup-failed':report['backend']['candidate']['cleanup']='failed'
     if kind=='input-mismatch':report['backend']['candidate']['seed_sha256']='d'*64
+    if kind=='missing-uat':report['backend']['candidate'].pop('uat_admin_browser')
+    if kind=='skipped-uat':report['backend']['candidate']['uat_admin_browser']='skipped'
     (path/'verification.json').write_text(json.dumps(report))
     with pytest.raises(ValueError):publish(path,fingerprint(path),api,enabled=True)
     assert not any(method=='POST' for method,_,_ in api.calls)

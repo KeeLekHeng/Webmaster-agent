@@ -37,6 +37,16 @@ access. Mock-specific tests and skipped legacy suites SHALL be disclosed separat
 - **WHEN** an existing suite lacks MFA automation
 - **THEN** MFA SHALL NOT be disabled to make that suite pass and its coverage limit SHALL be recorded
 
+#### Scenario: Documented password-only UAT configuration
+- **WHEN** the trusted admin smoke test runs against the disposable backend
+- **THEN** a separate application process SHALL use the documented `REQUIRE_ADMIN_MFA=false` UAT configuration
+- **AND** it SHALL verify anonymous rejection, real password login, synthetic draft creation/read/update/deletion, database persistence, draft privacy and actual sign-out without success mocks or saved sessions
+- **AND** the separate MFA-on probe SHALL still pass; neither profile changes production configuration or enables the extensive legacy admin suites
+
+#### Scenario: Admin smoke coverage is absent
+- **WHEN** either required admin profile fails or its proof is missing, skipped or malformed
+- **THEN** verification and dependency publishing SHALL be blocked
+
 ### Requirement: Independent backend proof and cleanup
 Publishing SHALL require backend evidence for each tested copy and successful
 scoped cleanup. Earlier mock-only reports SHALL NOT authorize publication.

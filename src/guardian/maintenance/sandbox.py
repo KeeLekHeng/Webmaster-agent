@@ -51,7 +51,9 @@ class CheckFailure(ValueError):
         if hasattr(self, 'browser_summary'):
             result['browser_summary'] = self.browser_summary
         auth = re.search(r'guardian_real_auth_probe_failed:([a-z-]+)', text)
-        if auth and auth[1] in {'start','anonymous-redirect','password-login','mfa-enrollment','mfa-management-access','logout'}:
+        if auth and auth[1] in {'start','anonymous-redirect','password-login','mfa-enrollment','mfa-management-access','logout',
+                               'uat-start','uat-anonymous-rejection','uat-password-login','uat-draft-create','uat-draft-read',
+                               'uat-draft-update','uat-draft-delete','uat-logout'}:
             result['auth_probe_phase'] = auth[1]
         return result
 
@@ -297,9 +299,13 @@ class Sandbox:
                 print(json.dumps({'sandbox_stage': stage, 'status': 'running'}), flush=True)
                 try:
                     if stage == 'browser' and self.backend:
-                        self.backend.evidence['phase']='mfa-browser'
-                        self.run(workspace, ['node', '/trusted/real-backend.cjs'], timeout=180)
-                        self.backend.evidence['mfa_browser'] = 'passed'
+                        self.backend.evidence['phase']='admin-browser'
+                        raw=self.run(workspace, ['node', '/trusted/real-backend.cjs'], timeout=300)
+                        if len(raw)>1024:raise ValueError('Admin probe evidence budget exceeded')
+                        proof=json.loads(raw)
+                        if proof!={'real_password_mfa_browser':'passed','uat_admin_browser':'passed'}:
+                            raise ValueError('Both real admin profiles must pass')
+                        self.backend.evidence.update(mfa_browser='passed',uat_admin_browser='passed')
                         self.backend.evidence['phase']='browser-suite'
                     self.run(workspace, ['bash', '/trusted/check.sh', stage], timeout=1200)
                     if stage == 'browser' and self.backend:
