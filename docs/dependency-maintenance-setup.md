@@ -7,6 +7,17 @@ the Guardian workflow. Settings below belong to **KeeLekHeng/Webmaster-agent**.
 
 ## Review, merge and deploy
 
+The original backend setup (Guardian #1 / SIS #4) is merged. Current follow-up
+reviews are [Guardian #2](https://github.com/KeeLekHeng/Webmaster-agent/pull/2)
+and [SIS #6](https://github.com/KeeLekHeng/sisweb/pull/6). After reviewing their
+actual latest results and merging both, run a fresh paired trial against SIS main
+with publishing off: an unmerged-source preview cannot authorize publishing.
+SIS #5 is an independent Actions pin refresh; its owner-deferred merge is not
+required for the label repair. Deploy SIS runtime changes only through the owner's
+normal process. Guardian's Actions changes need no VPS package deployment.
+
+Original backend bootstrap procedure (completed; retained for context):
+
 1. Review [SIS PR #4](https://github.com/KeeLekHeng/sisweb/pull/4), including the
    Linux reference images and its successful manual full run at the exact head.
    Its PR-event bootstrap failure happens before website testing because the
@@ -98,14 +109,17 @@ Eligible private display-component source is sent to Claude for this feature;
 leave it false if source sharing is not desired. See the architecture scope rules.
 PRs can then include mechanical component repairs as well as the two package files.
 
-The initial SIS CI setup was merged. Its follow-up [PR #4](https://github.com/KeeLekHeng/sisweb/pull/4)
-on `guardian/diagnose-sandbox-build` carries verifier corrections and the backend
-extension. Review the final changes before merging in **KeeLekHeng/sisweb**.
-Its initial run deliberately fails if the base branch
-does not yet contain the reviewed verifier. That bootstrap failure is expected;
-review the setup files before merging, then manually run **SIS isolated PR
-verification** on main to establish the first real pass. Subsequent SIS PRs use
-the reviewed base verifier automatically; no extra secrets are needed there.
+The owner merged SIS [PR #4](https://github.com/KeeLekHeng/sisweb/pull/4) and Guardian
+[PR #1](https://github.com/KeeLekHeng/Webmaster-agent/pull/1). Post-merge
+[SIS main verification](https://github.com/KeeLekHeng/sisweb/actions/runs/41180334440)
+passed the bootstrap guard and every stage, with one disclosed browser retry.
+The earlier bootstrap failure was before website testing because the reviewed
+base lacked the new assets. Subsequent SIS PRs use the installed base verifier;
+no extra secrets are needed in SIS. The owner provided Guardian's scoped reader
+and activation settings; the first trial successfully checked out SIS but blocked
+the upgraded candidate on a browser-toolchain mismatch. See the canonical
+[current rollout status](dependency-maintenance.md#current-rollout-status) before
+enabling publishing or changing eligibility policy.
 Do not infer a successful build from setup/mocked tests. If branch protection is
 unavailable, inspect both repositories' successful checks before merging an upgrade.
 
@@ -208,6 +222,22 @@ on the setup branch. An ordinary PR check may still use the older base verifier.
 Inspect the run's event, ref and tested SHA before interpreting its result.
 
 ## Stop, troubleshoot and recover
+
+For a proposed controller change, select its branch under **Actions > Verified
+SIS dependency maintenance > Run workflow**. Non-main dispatches are verification
+previews: they cannot publish, invoke repair/interpretation models, or use the
+writer. Main retains its explicit activation flags. Inspect the selected ref,
+tested SHA and saved report; a green preview does not enable automatic publishing.
+
+The optional **preview_sis_sha** input accepts a full lowercase 40-character SIS
+commit SHA to test an unmerged repair. It is allowed only for manual non-main
+controller previews. Main and scheduled runs reject overrides; an empty input
+uses SIS `main`. Every stage still runs, without publishing or model access.
+
+Browser-package updates are reported as deferred to a separately reviewed
+toolchain change. Coordinate package/lock and reviewed image versions, run all
+checks, and explicitly review any visual-reference changes. Do not bypass the
+browser or admin tests to accommodate a mismatched image.
 
 - Disable PR creation: `GUARDIAN_DEPENDENCY_PRS_ENABLED=false`.
 - Stop new maintenance runs: `GUARDIAN_MAINTENANCE_ENABLED=false` and cancel any

@@ -17,7 +17,9 @@
 - [x] Establish the initial fully passing SIS baseline (41041467795).
 - [ ] Obtain paired dependency-upgrade proof with both admin profiles.
 - [x] Verify both admin profiles and real draft persistence in the full Actions run.
-- [ ] Owner reviews/merges SIS setup; enable dependency trial separately.
+- [x] Owner reviews/merges SIS and Guardian setup; verify SIS main.
+- [x] Configure the scoped reader and enable the verification-only dependency trial.
+- [ ] Resolve browser-toolchain coupling with an explicit owner-selected policy.
 
 ## Evidence and remaining blocker
 - Startup control 41028651056 passed startup, real SQL and cleanup without website
@@ -34,8 +36,15 @@
   88 disclosed skips. This is not yet paired dependency-upgrade evidence.
 - Local regression: 432 passed, two Windows skips. Strict OpenSpec validation passed.
   Local orchestration tests do not replace the real Actions trial.
-- Assets are in SIS PR #4, including 34 Linux references captured from approved
-  main and a contact-test panel-opening precondition correction. Owner review and
-  merge remain outstanding; no production changes or merges were performed.
-- Paired dependency-upgrade proof is still pending. Guardian Actions needs a
-  scoped SIS read token before that trial; publishing needs separate activation.
+- Owner merged SIS #4 (`6d40faf`) and Guardian #1 (`fb89a8f`). SIS main run
+  41180334440 passed the bootstrap guard, all stages, both admin profiles and
+  cleanup: 307 expected browser passes, one flaky pass after retry, 88 skips.
+  The current safe report cannot identify the retried case; record this limit.
+  No agent deployment or production changes were performed.
+- First Guardian trial 41191170056 used the scoped reader and passed the baseline.
+  A 15-package candidate passed through build but failed integration at browser
+  launch: selected Playwright 1.64.1 differs from the pinned 1.62.1 image. Candidate
+  browser/admin profiles did not run. Both stacks cleaned up; publishing skipped.
+- Existing high zod and moderate minimatch advisories were unchanged. Paired
+  upgrade proof remains pending. Do not skip the toolchain update silently or
+  weaken browser checks; owner policy choice and weekly/manual preference pending.

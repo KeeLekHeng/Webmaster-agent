@@ -69,6 +69,28 @@ def test_browser_summary_retains_structured_location_and_allowlisted_matcher(tmp
     assert 'private-token' not in json.dumps(result)
 
 
+@pytest.mark.parametrize('status',['unexpected','flaky'])
+def test_accessibility_diagnostics_keep_known_rules_route_and_retry_location_only(tmp_path,status):
+    path=tmp_path/'test-results'/'e2e-report.json';path.parent.mkdir()
+    error={'message':'expect(received).toEqual(expected)\n\x1b[32m+   "id": "color-contrast",\x1b[39m\n+ "id": "private-secret",\n+ "nodes": ["[data-email=private@example.com]"]',
+           'location':{'file':'/work/tests/e2e/search-discovery.spec.ts','line':158,'column':7}}
+    spec={'file':'search-discovery.spec.ts','line':148,'title':'public accessibility /careers',
+          'tests':[{'status':status,'projectName':'desktop-chromium','results':[{'errors':[error]}]}]}
+    path.write_text(json.dumps({'stats':{status:1},'suites':[{'specs':[spec]}]}))
+    summary=browser_summary(tmp_path)
+    entry=summary['flaky' if status=='flaky' else 'failures'][0]
+    assert entry['public_route']=='/careers' and entry['axe_rule_ids']==['color-contrast']
+    assert entry['matchers']==['toEqual']
+    assert entry['assertion_locations']==['tests/e2e/search-discovery.spec.ts:158:7']
+    assert 'private' not in json.dumps(summary) and 'example.com' not in json.dumps(summary)
+
+
+@pytest.mark.parametrize('title',['private title','public accessibility /manage','public accessibility /careers?token=private',None])
+def test_accessibility_diagnostics_reject_unknown_route_or_title(title):
+    from guardian.maintenance.sandbox import accessibility_details
+    assert accessibility_details({'title':title},['+ "id": "color-contrast",'])=={}
+
+
 @pytest.mark.parametrize('passed',[0,2])
 def test_browser_gate_rejects_all_skipped_coverage(tmp_path,monkeypatch,passed):
     from types import SimpleNamespace
