@@ -1,0 +1,7 @@
+- [x] Record failed-trial evidence and owner-approved separation.
+- [x] Implement trusted version binding, explicit deferrals and inventory gates.
+- [x] Enforce the boundary independently in publishing and human/AI reports.
+- [x] Add read-only branch preview and refresh reviewed Node 24 action pins.
+- [x] Test deferrals, advisory visibility, drift and publisher/preview rejection.
+- [ ] Run all local checks and a real publishing-disabled application-upgrade trial.
+- [ ] Open a reviewable PR with actual evidence and remaining limits.

@@ -6,7 +6,7 @@ production changes, deletion, new credentials or additional scheduled jobs.
 
 | Rank | Work | Status / completion evidence |
 | --- | --- | --- |
-| 1 | Review CI setup and trial paired dependency maintenance | Full SIS run 41164653090 passed MFA-on and password-only UAT draft lifecycle, all stages and cleanup: 308 browser passes, zero failures/flaky tests, 88 disclosed skips. Guardian: 432 passed, two skips. Both setup PRs ready for owner review; merge, scoped read token and paired dependency trial remain pending. [SIS PR #4](https://github.com/KeeLekHeng/sisweb/pull/4), [Guardian PR #1](https://github.com/KeeLekHeng/Webmaster-agent/pull/1), [setup](docs/dependency-maintenance-setup.md) |
+| 1 | Verify application upgrades with separately reviewed browser updates | Owner approved explicit browser-toolchain deferrals after [trial 41191170056](https://github.com/KeeLekHeng/Webmaster-agent/actions/runs/41191170056) exposed the package/image mismatch. Version binding, inventory/publisher gates, read-only branch previews and native Node 24 Actions are implemented; real preview pending. Every test gate remains required. Existing high zod and moderate minimatch advisories remain. Publishing stays off; weekly/manual preference is pending. [Setup](docs/dependency-maintenance-setup.md) |
 | 2 | Verify the first automatic weekly digest and missed-run behavior | Pending Monday execution; inspect task results, stage records and owner delivery |
 | 3 | Deploy and trial manual retention | Preview/apply implemented and tested locally: 90-day eligible detail, 13 months numeric observations; protected references and offline checks. VPS upgrade pending; no automatic deletion enabled. [Operations](docs/retention.md) |
 | 4 | Improve speed comparison coverage | Evaluate sample frequency; current weekly sampling is below the stronger regression threshold |
@@ -14,6 +14,11 @@ production changes, deletion, new credentials or additional scheduled jobs.
 | 6 | Move Guardian to a dedicated VPS | Temporary host cutover verified; owner confirmed bot reply. Keep reusable deployment sources and migrate fresh state later: [deployment guide](docs/vps.md) |
 | 7 | Split the technical guide into a routed context library | Planned; structure and acceptance criteria below |
 | 8 | Validate demand for a maintenance service | Before multi-tenancy, billing or dashboards |
+
+CI diagnostic follow-up: include retried/flaky test source locations in the bounded
+browser summary. The current report records their count but only lists unexpected
+failures, so main run 41180334440 cannot identify its retried case. Preserve raw
+message/session redaction and existing test assertions.
 
 ## Documentation library refactor
 

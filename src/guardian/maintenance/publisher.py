@@ -7,7 +7,7 @@ import re
 from pathlib import Path
 import httpx
 
-from guardian.maintenance.policy import FILES, changes, digest, security_gate, verification
+from guardian.maintenance.policy import FILES, SECTIONS, changes, check_toolchain_inventory, deferred_updates, digest, manifest, security_gate, toolchain_versions, verification
 from guardian.maintenance import repairs
 
 REPOSITORY = 'KeeLekHeng/sisweb'
@@ -101,6 +101,8 @@ class GitHub:
 def publish(directory, expected, api, *, enabled=False, run_url='', replayer=repairs.replay):
     if not enabled:
         return {'status': 'disabled'}
+    if os.getenv('GITHUB_ACTIONS')=='true' and os.getenv('GITHUB_REF')!='refs/heads/main':
+        raise ValueError('Non-main verification previews cannot publish')
     directory = Path(directory)
     if directory.is_symlink() or any(p.is_symlink() for p in directory.rglob('*')):
         raise ValueError('Symlink artifact forbidden')
@@ -137,6 +139,14 @@ def publish(directory, expected, api, *, enabled=False, run_url='', replayer=rep
     updates = changes(originals['package.json'], candidate['package.json'])
     if updates != report['updates']:
         raise ValueError('Dependency delta does not match verified policy')
+    source_manifest=manifest(originals['package.json'])
+    packages={name for section in SECTIONS for name in source_manifest.get(section,{})}
+    deferred=deferred_updates(report.get('deferred_updates',[]))
+    if any(source_manifest.get(d['section'],{}).get(d['package'])!=d['before'] for d in deferred):
+        raise ValueError('Deferred version does not match source')
+    reviewed=toolchain_versions(Path(__file__).resolve().parents[3]/'maintenance')
+    for key in ('resolved_before','resolved_after'):
+        check_toolchain_inventory(report.get(key,{}),reviewed,packages)
     if source_names:
         source_originals = {n: originals[n] for n in source_names}
         reproduced = replayer(report['repair_plan'], source_originals, updates)
@@ -173,6 +183,9 @@ def publish(directory, expected, api, *, enabled=False, run_url='', replayer=rep
     lines = ['Updates existing dependencies within the approved stable same-major policy.', '',
              '| Package | Before | After |', '| --- | --- | --- |']
     lines += [f"| {u['package']} | {u['before']} | {u['after']} |" for u in updates]
+    if deferred:
+        lines += ['', 'Deferred browser-toolchain updates (not included or verified):']
+        lines += [f"- `{d['package']}`: `{d['before']}` to `{d['available']}` requires a coordinated browser-image review." for d in deferred]
     if source_names:
         plan = repairs.validate(report['repair_plan'], updates)
         lines += ['', 'Compatibility repairs (full candidate checks rerun after repair):']

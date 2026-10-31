@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from guardian.core.models import AnalysisResult, Evidence, Finding, Report
-from guardian.maintenance.policy import PACKAGE, STAGES, declared
+from guardian.maintenance.policy import PACKAGE, STAGES, declared, deferred_updates
 from guardian.workflows.investigation import ClaudeInvestigator, filter_investigation, project_evidence, investigation_failure_notice
 from guardian.checks.audit import save_report
 from guardian.core.network import enabled
@@ -38,28 +38,38 @@ def make_report(value, site_id='estateplanning'):
                 'candidate_passed_count': sum(value.get('candidate', {}).get(s) == 'passed' for s in STAGES)}))
         report.findings.append(Finding(title='Dependency verification incomplete', severity='low', confidence='high',
             evidence_ids=['E001'], next_step='Inspect the first incomplete CI stage and rerun verification; no verified upgrade is established.'))
-    for release in value.get('releases', []):
+    deferred={(d['package'],d['section']):d for d in deferred_updates(value.get('deferred_updates',[]))}
+    releases=value.get('releases',[])
+    if not set(deferred).issubset({(r.get('package'),r.get('section')) for r in releases}):
+        raise ValueError('Toolchain deferral has no matching release evidence')
+    for release in releases:
         name = release.get('package', '')
         if not PACKAGE.fullmatch(name):
             raise ValueError('Invalid package identity')
         declared(release['declared'])
         declared(release['eligible'])
+        manual=deferred.get((name,release.get('section')))
+        eligible=manual['available'] if manual else release['eligible']
+        if manual and manual['before']!=release['declared']:raise ValueError('Deferred version evidence differs')
         affected = [a for a in advisories if a.get('package') == name]
-        if release['eligible'] == release['declared'] and not affected:
+        if eligible == release['declared'] and not affected and not manual:
             continue
+        verified=value.get('status')=='verified' and not manual and eligible!=release['declared']
         severities = {a.get('severity') for a in affected}
         severity = 'high' if severities & {'critical', 'high'} else 'medium' if 'moderate' in severities else 'low' if affected else 'info'
         eid = f'E{len(report.evidence)+1:03d}'
         report.evidence.append(Evidence(id=eid, timestamp=observed, source='repository:' + value['base_sha'],
             check='dependencies', outcome='finding', details={
-                'package': name, 'declared': release['declared'], 'eligible': release['eligible'],
+                'package': name, 'declared': release['declared'], 'eligible': eligible,
                 'dependency_type': release.get('section', 'unknown'),
                 'advisories': [{k:a[k] for k in ('id','severity','ghsa','cves','cwes','affected_range','patched_range') if k in a} for a in affected],
-                'advisory_count': len(affected), 'upgrade_verified': value.get('status') == 'verified',
-                'compatible_update_available': release['eligible'] != release['declared']}))
-        report.findings.append(Finding(title=('Known advisory reported: ' if affected else 'Compatible dependency update: ') + name,
+                'advisory_count': len(affected), 'upgrade_verified': bool(verified),
+                'toolchain_review_required': bool(manual),
+                'compatible_update_available': eligible != release['declared']}))
+        report.findings.append(Finding(title=('Browser toolchain review required: ' if manual else 'Known advisory reported: ' if affected else 'Compatible dependency update: ') + name,
             severity=severity, confidence='high', evidence_ids=[eid],
-            next_step='Review the verified CI artifact and dependency diff; merge/deploy remain human decisions.' if value.get('status') == 'verified'
+            next_step='Review the browser package and matching image together, rerun all checks and review snapshot changes. This update was deferred from the automatic batch.' if manual
+            else 'Review the verified CI artifact and dependency diff; merge/deploy remain human decisions.' if verified
             else 'Review the advisory and blocked verification stages. No verified upgrade or production safety is established.'))
     # Transitive advisories must remain visible even when no direct upgrade fixes them.
     direct = {r['package'] for r in value.get('releases', [])}
