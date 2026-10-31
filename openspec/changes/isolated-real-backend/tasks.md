@@ -29,10 +29,10 @@
   contact-test panel-opening precondition retained their original assertions.
 - The owner approved minimal admin coverage matching documented password-only UAT,
   while retaining the MFA-on probe and leaving extensive legacy UI cases skipped.
-  Exact-head run 41163143674 passed both profiles, real draft persistence, all
+  Exact-head run 41164653090 passed both profiles, real draft persistence, all
   seven stages and cleanup: 308 broad browser passes, zero failures/flaky tests,
   88 disclosed skips. This is not yet paired dependency-upgrade evidence.
-- Local regression: 428 passed, two Windows skips. Strict OpenSpec validation passed.
+- Local regression: 432 passed, two Windows skips. Strict OpenSpec validation passed.
   Local orchestration tests do not replace the real Actions trial.
 - Assets are in SIS PR #4, including 34 Linux references captured from approved
   main and a contact-test panel-opening precondition correction. Owner review and

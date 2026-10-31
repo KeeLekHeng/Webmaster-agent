@@ -129,6 +129,27 @@ def test_totp_matches_rfc6238_vectors():
     assert json.loads(result.stdout)==['287082','081804','005924']
 
 
+@pytest.mark.parametrize('state',[{'exitCode':0,'signalCode':None},{'exitCode':None,'signalCode':'SIGTERM'}])
+def test_server_cleanup_returns_for_already_exited_or_signalled_process(state):
+    code='''const {stopServer}=require(process.argv[1]);
+      const server={...JSON.parse(process.argv[2]),kill(){throw Error("Dead process must not be killed")}};
+      stopServer(server).then(()=>console.log("stopped")).catch(()=>process.exitCode=1);'''
+    result=subprocess.run(['node','-e',code,str(Path('maintenance/real-backend.cjs').resolve()),json.dumps(state)],
+                          capture_output=True,text=True,check=True,timeout=5)
+    assert result.stdout.strip()=='stopped'
+
+
+def test_server_cleanup_waits_for_normal_termination_without_lingering_timeout():
+    code='''const {EventEmitter}=require("node:events");const {stopServer}=require(process.argv[1]);
+      const server=Object.assign(new EventEmitter(),{exitCode:null,signalCode:null});
+      server.kill=signal=>{setImmediate(()=>{server.signalCode=signal;server.emit("exit",null,signal)});return true};
+      stopServer(server).then(()=>{if(server.signalCode!=="SIGTERM")throw Error("Not terminated");console.log("stopped")})
+        .catch(()=>process.exitCode=1);'''
+    result=subprocess.run(['node','-e',code,str(Path('maintenance/real-backend.cjs').resolve())],
+                          capture_output=True,text=True,check=True,timeout=5)
+    assert result.stdout.strip()=='stopped'
+
+
 def test_startup_diagnostics_never_copy_secrets():
     output=b'local-key=secret-value failed to connect to postgres: connection refused'
     assert backend.startup_diagnostics(output)==['connection-refused','health-check','postgres-connection']

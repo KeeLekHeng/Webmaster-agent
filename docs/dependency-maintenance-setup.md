@@ -5,11 +5,30 @@
 Start with verification only. No SIS dependency PR is created merely by pushing
 the Guardian workflow. Settings below belong to **KeeLekHeng/Webmaster-agent**.
 
+## Review, merge and deploy
+
+1. Review [SIS PR #4](https://github.com/KeeLekHeng/sisweb/pull/4), including the
+   Linux reference images and its successful manual full run at the exact head.
+   Its PR-event bootstrap failure happens before website testing because the
+   reviewed base lacks the new verifier. Keep that guard intact.
+2. Merge the reviewed SIS setup, then manually run **SIS isolated PR verification**
+   on `main`. After that pass, deploy SIS through its normal owner-run deployment
+   procedure if desired. The runtime change is the small iframe focus CSS fix;
+   the verifier assets are CI-only. No dependency or production MFA setting changes.
+3. Review and merge [Guardian PR #1](https://github.com/KeeLekHeng/Webmaster-agent/pull/1).
+   These maintenance jobs run in GitHub Actions; a Guardian VPS package deployment
+   is not needed for them. Do not install the disposable backend on the shared VPS.
+4. Configure the scoped reader and run the paired baseline/candidate trial below
+   with publishing disabled. Enable dependency PR publishing only after that
+   trial passes. Merging these setup PRs alone does not prove an upgrade or activate
+   publishing; no production deployment occurs automatically.
+
 ## Credentials
 
 Use GitHub Settings → Developer settings → Personal access tokens → Fine-grained
 tokens, or separately installed GitHub App credentials. Select only the SIS repo.
-Create/provide two independently scoped credentials:
+Use the reader for the first verification-only trial. Add the independently
+scoped writer only when ready to enable dependency PR publishing:
 
 | Actions secret | Selected repository | Repository permissions |
 | --- | --- | --- |
@@ -22,7 +41,7 @@ by checkout with credential persistence disabled. Neither enters the test contai
 An opaque PAT can have broader rights than the application uses; scope it narrowly.
 
 In the **Guardian repository**, open Settings → Secrets and variables → Actions →
-Secrets → New repository secret. Add the two values there, never in chat or Git.
+Secrets → New repository secret. Add the required value there, never in chat or Git.
 Existing suitable scoped credentials can be reused after reviewing their permissions;
 do not copy production `.env` files into Actions. Set an expiry and plan renewal.
 
@@ -47,6 +66,9 @@ maps, image ID and coverage limitations. No update may be needed that week.
 The normal schedule is Monday 07:00 Malaysia (Sunday 23:00 UTC), independent of
 the existing Monday 09:00 VPS reporting timer. CI results are not yet automatically
 inserted into that Telegram digest. GitHub provides workflow/PR notifications.
+`GUARDIAN_MAINTENANCE_ENABLED=true` allows both manual and scheduled verification.
+For a manual-only trial, return it to `false` afterwards until weekly execution
+is desired; the separate publishing flag stays `false` throughout the first trial.
 
 ## Enable automatic PRs
 

@@ -1,10 +1,11 @@
-// Required real password + MFA browser probe. No route interception or auth bypass.
+// Required real MFA and UAT admin probes. No route interception or saved sessions.
 'use strict';
 const {spawn}=require('node:child_process');
+const {once}=require('node:events');
+const {setTimeout:sleep}=require('node:timers/promises');
 const crypto=require('node:crypto');
 let phase='start',browser,child;
 const origin='http://localhost:3100';
-const sleep=(ms)=>new Promise(resolve=>setTimeout(resolve,ms));
 function totp(secret, now=Date.now()){
   const alphabet='ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
   let bits='';
@@ -21,20 +22,26 @@ function totp(secret, now=Date.now()){
 async function startServer(mfaRequired){
   child=spawn(process.execPath,['/work/node_modules/next/dist/bin/next','start','-p','3100'],
     {cwd:'/work',env:{...process.env,REQUIRE_ADMIN_MFA:mfaRequired},stdio:'ignore',shell:false});
+  await once(child,'spawn');
   let ready=false;
   for(let i=0;i<60;i++){
-    try{const r=await fetch('http://localhost:3100/api/health',{signal:AbortSignal.timeout(1000)});if(r.ok){ready=true;break;}}catch{}
-    if(child.exitCode!==null)throw Error('Server exited');
+    try{const r=await fetch(origin+'/api/health',{signal:AbortSignal.timeout(1000)});if(r.ok){ready=true;break;}}catch{}
+    if(child.exitCode!==null||child.signalCode!==null)throw Error('Server exited');
     await sleep(500);
   }
   if(!ready)throw Error('Server not ready');
 }
-async function stopServer(){
-  if(!child)return;
-  const stopped=new Promise(resolve=>child.once('exit',resolve));
-  child.kill('SIGTERM');await Promise.race([stopped,sleep(3000)]);
-  if(child.exitCode===null){child.kill('SIGKILL');await stopped;}
-  child=undefined;
+async function stopServer(server=child){
+  if(!server)return;
+  if(server===child)child=undefined;
+  if(server.exitCode!==null||server.signalCode!==null)return;
+  const stopped=once(server,'exit');
+  for(const signal of ['SIGTERM','SIGKILL']){
+    server.kill(signal);
+    await Promise.race([stopped,sleep(3000,undefined,{ref:false})]);
+    if(server.exitCode!==null||server.signalCode!==null)return;
+  }
+  throw Error('Test server did not stop');
 }
 async function passwordLogin(page){
   await page.getByLabel('Email',{exact:true}).fill(process.env.GUARDIAN_TEST_ADMIN_EMAIL);
@@ -46,7 +53,7 @@ async function verifyMfa(){
   const context=await browser.newContext(); // No traces/video/saved auth storage.
   const page=await context.newPage();page.setDefaultTimeout(15000);
   phase='anonymous-redirect';
-  await page.goto('http://localhost:3100/manage');
+  await page.goto(origin+'/manage');
   await page.waitForURL(url=>url.pathname==='/manage/login');
   phase='password-login';
   await passwordLogin(page);
@@ -57,13 +64,13 @@ async function verifyMfa(){
   await page.getByRole('button',{name:'Verify code',exact:true}).click();
   phase='mfa-management-access';
   await page.waitForURL(url=>url.pathname==='/manage');
-  const response=await context.request.get('http://localhost:3100/api/manage/session');
+  const response=await context.request.get(origin+'/api/manage/session');
   if(response.status()!==200)throw Error('Verified session missing');
-  await page.goto('http://localhost:3100/manage/blogs');
+  await page.goto(origin+'/manage/blogs');
   await page.getByRole('heading',{name:'Blog library',exact:true}).waitFor();
   phase='logout';
   await context.clearCookies();
-  await page.goto('http://localhost:3100/manage');
+  await page.goto(origin+'/manage');
   await page.waitForURL(url=>url.pathname==='/manage/login');
   await context.close();
   await stopServer();
@@ -76,6 +83,16 @@ async function draftRows(slug,anonymous=false){
   const rows=await response.json();
   if(!Array.isArray(rows)||rows.length>1)throw Error('Unexpected draft inventory');
   return rows;
+}
+async function expectDraft(page,draft){
+  const rows=await draftRows(draft.slug);
+  if(rows.length!==1||rows[0].title!==draft.title||rows[0].status!=='draft'||rows[0].blocks?.[0]?.text!==draft.blocks[0].text)
+    throw Error('Draft not persisted');
+  if((await draftRows(draft.slug,true)).length!==0)throw Error('Private draft publicly readable');
+  await page.goto(origin+'/manage/blogs/'+draft.slug);
+  const {expect}=require('/work/node_modules/@playwright/test');
+  await expect(page.getByPlaceholder('Title',{exact:true})).toHaveValue(draft.title);
+  await expect(page.locator('.blog-editor__paragraph textarea').first()).toHaveValue(draft.blocks[0].text);
 }
 async function verifyUat(){
   phase='uat-start';await startServer('false');
@@ -99,25 +116,12 @@ async function verifyUat(){
   if(created.status()!==200)throw Error('Draft create failed');
   const createdBody=await created.json();
   if(createdBody.slug!==slug||createdBody.status!=='draft')throw Error('Draft create result invalid');
-  let rows=await draftRows(slug);
-  if(rows.length!==1||rows[0].title!==draft.title||rows[0].status!=='draft'||rows[0].blocks?.[0]?.text!==draft.blocks[0].text)
-    throw Error('Created draft not persisted');
-  if((await draftRows(slug,true)).length!==0)throw Error('Private draft publicly readable');
   phase='uat-draft-read';
-  await page.goto(origin+'/manage/blogs/'+slug);
-  await page.getByPlaceholder('Title',{exact:true}).waitFor();
-  const {expect}=require('/work/node_modules/@playwright/test');
-  await expect(page.getByPlaceholder('Title',{exact:true})).toHaveValue(draft.title);
-  await expect(page.locator('.blog-editor__paragraph textarea').first()).toHaveValue(draft.blocks[0].text);
+  await expectDraft(page,draft);
   phase='uat-draft-update';
   const updated={...draft,title:'Guardian synthetic draft edited',blocks:[{type:'paragraph',text:'Verified updated body'}]};
   if((await context.request.put(origin+'/api/manage/blogs',{headers,data:updated})).status()!==200)throw Error('Draft update failed');
-  rows=await draftRows(slug);
-  if(rows.length!==1||rows[0].title!==updated.title||rows[0].blocks?.[0]?.text!==updated.blocks[0].text)
-    throw Error('Updated draft not persisted');
-  await page.reload();
-  await expect(page.getByPlaceholder('Title',{exact:true})).toHaveValue(updated.title);
-  await expect(page.locator('.blog-editor__paragraph textarea').first()).toHaveValue(updated.blocks[0].text);
+  await expectDraft(page,updated);
   phase='uat-draft-delete';
   // Leave the editor before deletion, so autosave cannot race the cleanup.
   await page.goto(origin+'/manage/blogs');
@@ -143,9 +147,7 @@ async function main(){
   await verifyMfa();await verifyUat();
   process.stdout.write(JSON.stringify({real_password_mfa_browser:'passed',uat_admin_browser:'passed'})+'\n');
 }
-module.exports={totp};
-if(require.main===module)main().catch(()=>{process.stderr.write('GUARDIAN_REAL_AUTH_PROBE_FAILED:'+phase+'\n');process.exitCode=1;})
-  .finally(async()=>{
-    if(browser)await browser.close();
-    await stopServer();
-  });
+module.exports={totp,stopServer};
+if(require.main===module)main().finally(async()=>{
+  try{if(browser)await browser.close();}finally{await stopServer();}
+}).catch(()=>{process.stderr.write('GUARDIAN_REAL_AUTH_PROBE_FAILED:'+phase+'\n');process.exitCode=1;});

@@ -25,7 +25,7 @@ def run(repository, output, image, *, sandbox_factory=Sandbox, registry=metadata
               'backend': {},
               'coverage': ['real-backend-required', 'synthetic-data', 'targeted-auth-failure-mocks', 'intercepted-email', 'cached-google-font', 'no-production-access'],
               'limits': ['Tests are evidence for covered behavior, not a guarantee of all live integrations.',
-                         'Legacy password-only admin suites remain skipped; a separate required probe exercises real password/MFA access.',
+                         'Extensive legacy admin UI suites remain skipped; separate real MFA and password-only UAT draft probes are required.',
                          'Nonsecurity releases require seven days of age; 0.x minor changes require manual review.',
                          'Package scripts/hooks are disabled during install; blocked native builds require human review.']}
     try:
@@ -146,7 +146,7 @@ def run(repository, output, image, *, sandbox_factory=Sandbox, registry=metadata
         # Do not publish arbitrary registry/package/test output or credentials.
         report['status'] = 'blocked'
         report['failure_kind'] = type(exc).__name__
-        if 'sandbox' in locals() and getattr(sandbox,'backend_evidence',None):
+        if report['phase'] in {'baseline-checks','candidate-checks','repaired-candidate-checks'} and 'sandbox' in locals() and getattr(sandbox,'backend_evidence',None):
             kind='baseline' if report['phase']=='baseline-checks' else 'candidate'
             report['backend'][kind]=dict(sandbox.backend_evidence)
         if isinstance(exc, (CheckFailure, CheckTimeout, IntegrityFailure)):

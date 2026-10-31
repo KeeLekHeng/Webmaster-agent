@@ -100,3 +100,16 @@ def test_candidate_failure_never_emits_publishable_files(setup,tmp_path):
     assert report['baseline']=={s:'passed' for s in STAGES}
     assert report['status']=='blocked' and report['phase']=='candidate-checks'
     assert not (tmp_path/'result'/'package.json').exists()
+
+
+def test_candidate_install_failure_does_not_relabel_baseline_backend_proof(setup,tmp_path):
+    class FailedInstall(Sandbox):
+        def install(self,path,frozen):
+            if path.name=='candidate':raise ValueError('Candidate install failed')
+            super().install(path,frozen)
+    report=runner.run('unused',tmp_path/'result','sha256:'+'a'*64,
+                      sandbox_factory=FailedInstall,registry=registry,fixtures=lambda p:{})
+    assert report['status']=='blocked' and report['phase']=='candidate-install'
+    assert set(report['backend'])=={'baseline'}
+    assert report['candidate']=={}
+    assert not (tmp_path/'result'/'package.json').exists()

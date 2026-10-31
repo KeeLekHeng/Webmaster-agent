@@ -174,7 +174,7 @@ semantic behavior; these recipes do not guarantee correct migration logic.
 
 ## Current rollout status
 
-The real-service verifier is in [Guardian draft PR #1](https://github.com/KeeLekHeng/Webmaster-agent/pull/1) and vendored
+The real-service verifier is in [Guardian PR #1](https://github.com/KeeLekHeng/Webmaster-agent/pull/1) and vendored
 into [SIS CI setup PR #4](https://github.com/KeeLekHeng/sisweb/pull/4). This is a
 human-reviewed CI change; automatic dependency repairs cannot modify tests,
 configuration, backend or authentication code. No production/VPS changes occurred.
@@ -200,11 +200,16 @@ SIS explicitly documents `REQUIRE_ADMIN_MFA=false` for UAT in its README and
 admin-session guide. The owner approved a small real admin smoke test in that
 mode while retaining the separate MFA-on check and leaving the extensive legacy
 UI suite outside MVP coverage. Both profiles are now required by the controller
-and publisher. [Full run 41163143674](https://github.com/KeeLekHeng/sisweb/actions/runs/41163143674)
+and publisher. [Full run 41164653090](https://github.com/KeeLekHeng/sisweb/actions/runs/41164653090)
 passed both admin profiles, all seven stages and cleanup: 308 broad browser passes,
-zero failures/flaky tests, 88 disclosed skips. Guardian's local suite passed 428
+zero failures/flaky tests, 88 disclosed skips. Guardian's local suite passed 432
 tests with two Windows skips. This is successful SIS verification, not yet paired
 dependency-upgrade proof.
+
+Review amendments consolidated repeated draft checks, bounded server shutdown
+and prevented baseline backend proof being relabelled after candidate install
+failure. Both PRs are ready for owner review as disabled-by-default setup changes.
+See the [merge/deployment order](dependency-maintenance-setup.md#review-merge-and-deploy).
 
 The PR-event check stops at the explicit bootstrap guard because the reviewed
 base does not yet contain four new verifier assets. This occurs before website
