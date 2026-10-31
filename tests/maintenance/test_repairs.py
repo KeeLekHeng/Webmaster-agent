@@ -8,6 +8,7 @@ from guardian.maintenance.policy import STAGES, digest
 from guardian.maintenance.publisher import publish
 from tests.maintenance.test_runner import Sandbox, registry
 from tests.maintenance.test_publisher import API, fingerprint
+from tests.maintenance.backend_helpers import backend_proof
 
 PATH = 'src/components/public/Card.tsx'
 SOURCE = b'import { Old } from "react";\nexport const Card = () => <Old />;\n'
@@ -80,7 +81,7 @@ def test_failed_checks_cannot_modify_source_before_repair(tmp_path,monkeypatch):
         (tmp_path/'file.ts').write_text('tampered')
         raise CheckFailure(b'compiler output')
     monkeypatch.setattr(sandbox,'run',mutate)
-    with pytest.raises(ValueError,match='changed website source'): sandbox.checks(tmp_path,{})
+    with pytest.raises(ValueError,match='changed website source'): sandbox._checks(tmp_path,{})
 
 
 def test_one_repair_restarts_full_checks_from_pristine_source(tmp_path,monkeypatch,parser):
@@ -131,7 +132,7 @@ def test_publisher_replays_recipe_before_any_write(tmp_path,parser,tamper):
     candidates={'package.json':new,'pnpm-lock.yaml':b'new',
                 PATH:SOURCE.replace(b'{ Old }',b'{ New as Old }')+(b'console.log("extra");' if tamper else b'')}
     from guardian.maintenance.policy import changes
-    report={'version':1,'base_sha':'a'*40,'status':'verified','security_not_worsened':True,
+    report={'version':2,'backend':{k:backend_proof() for k in ('baseline','candidate')},'base_sha':'a'*40,'status':'verified','security_not_worsened':True,
             'advisories_before':[],'advisories_after':[],
             'baseline':{s:'passed' for s in STAGES},'candidate':{s:'passed' for s in STAGES},
             'updates':changes(old,new),'repair_plan':plan(),'repair_changed_lines':2,

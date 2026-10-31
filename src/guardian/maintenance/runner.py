@@ -7,7 +7,7 @@ import tempfile
 from pathlib import Path
 from datetime import datetime, timezone
 
-from guardian.maintenance.policy import FILES, SECTIONS, STAGES, changes, declared, digest, manifest, security_gate, select, version
+from guardian.maintenance.policy import FILES, SECTIONS, STAGES, backend_verification, changes, declared, digest, manifest, security_gate, select, version
 from guardian.maintenance.registry import metadata
 from guardian.maintenance.fixtures import font_fixture
 from guardian.maintenance.sandbox import Sandbox, CheckFailure, CheckTimeout, IntegrityFailure, command, export
@@ -19,11 +19,13 @@ def run(repository, output, image, *, sandbox_factory=Sandbox, registry=metadata
         repair_model=None, planner=repairs.propose, replayer=repairs.replay):
     output = Path(output)
     output.mkdir(parents=True, exist_ok=False)
-    report = {'version': 1, 'status': 'blocked', 'started_at': datetime.now(timezone.utc).isoformat(),
+    report = {'version': 2, 'status': 'blocked', 'started_at': datetime.now(timezone.utc).isoformat(),
               'phase': 'export', 'baseline': {}, 'candidate': {}, 'updates': [],
               'image_id': image, 'security_not_worsened': False,
-              'coverage': ['synthetic-data', 'mock-auth', 'mock-email', 'cached-google-font', 'no-production-access'],
+              'backend': {},
+              'coverage': ['real-backend-required', 'synthetic-data', 'targeted-auth-failure-mocks', 'intercepted-email', 'cached-google-font', 'no-production-access'],
               'limits': ['Tests are evidence for covered behavior, not a guarantee of all live integrations.',
+                         'Extensive legacy admin UI suites remain skipped; separate real MFA and password-only UAT draft probes are required.',
                          'Nonsecurity releases require seven days of age; 0.x minor changes require manual review.',
                          'Package scripts/hooks are disabled during install; blocked native builds require human review.']}
     try:
@@ -68,6 +70,8 @@ def run(repository, output, image, *, sandbox_factory=Sandbox, registry=metadata
             report['updates'] = changes(original['package.json'], proposed)
             report['phase'] = 'baseline-checks'
             sandbox.checks(baseline, report['baseline'])
+            report['backend']['baseline'] = dict(sandbox.backend_evidence)
+            backend_verification(report['backend']['baseline'])
             if not report['updates']:
                 report['status'] = 'no-compatible-updates'
                 report['phase'] = 'complete'
@@ -123,6 +127,10 @@ def run(repository, output, image, *, sandbox_factory=Sandbox, registry=metadata
                 tested.update(repaired)
                 report['phase'] = 'repaired-candidate-checks'
                 sandbox.checks(candidate, report['candidate'])
+            report['backend']['candidate'] = dict(sandbox.backend_evidence)
+            backend_verification(report['backend']['candidate'])
+            if any(report['backend']['baseline'][field]!=report['backend']['candidate'][field] for field in ('images','migrations','seed_sha256')):
+                raise ValueError('Paired backend inputs differ')
             if any((candidate / name).read_bytes() != data for name, data in tested.items()):
                 raise ValueError('Tests changed dependency artifacts')
             report['files'] = {}
@@ -138,6 +146,9 @@ def run(repository, output, image, *, sandbox_factory=Sandbox, registry=metadata
         # Do not publish arbitrary registry/package/test output or credentials.
         report['status'] = 'blocked'
         report['failure_kind'] = type(exc).__name__
+        if report['phase'] in {'baseline-checks','candidate-checks','repaired-candidate-checks'} and 'sandbox' in locals() and getattr(sandbox,'backend_evidence',None):
+            kind='baseline' if report['phase']=='baseline-checks' else 'candidate'
+            report['backend'][kind]=dict(sandbox.backend_evidence)
         if isinstance(exc, (CheckFailure, CheckTimeout, IntegrityFailure)):
             report['diagnostics'] = exc.diagnostics()
     finally:

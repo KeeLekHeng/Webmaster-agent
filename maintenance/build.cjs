@@ -1,4 +1,4 @@
-// Serve only cached font bytes over container loopback. Docker still uses network=none.
+// Serve cached font bytes over container loopback; external egress stays blocked.
 'use strict';
 const http = require('node:http');
 const fs = require('node:fs');

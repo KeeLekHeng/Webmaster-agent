@@ -4,6 +4,7 @@ from pathlib import Path
 import pytest
 from guardian.maintenance import runner, sandbox as sandbox_module
 from guardian.maintenance.policy import STAGES
+from tests.maintenance.backend_helpers import backend_proof
 
 
 class Sandbox:
@@ -16,6 +17,7 @@ class Sandbox:
         from guardian.maintenance.policy import declared
         return {name: '.'.join(map(str,declared(spec)[1])) for name,spec in package['dependencies'].items()}
     def checks(self, path, result):
+        self.backend_evidence=backend_proof()
         for stage in STAGES[1:]:
             if self.fail and stage == 'build': raise ValueError('synthetic private error')
             result[stage]='passed'
@@ -61,6 +63,7 @@ def test_sandbox_does_not_inherit_credentials_or_expose_host_network(tmp_path,mo
     assert args[args.index('--network')+1]=='none'
     assert '--cap-drop=ALL' in args and '--read-only' in args
     assert 'synthetic-secret' not in ' '.join(args)
+    assert 'ADMIN_SESSION_SECRET=guardian-synthetic-session-key-not-for-production' in args
     assert 'docker.sock' not in ' '.join(args)
 
 
@@ -96,4 +99,17 @@ def test_candidate_failure_never_emits_publishable_files(setup,tmp_path):
                       sandbox_factory=FailingCandidate,registry=registry,fixtures=lambda p:{})
     assert report['baseline']=={s:'passed' for s in STAGES}
     assert report['status']=='blocked' and report['phase']=='candidate-checks'
+    assert not (tmp_path/'result'/'package.json').exists()
+
+
+def test_candidate_install_failure_does_not_relabel_baseline_backend_proof(setup,tmp_path):
+    class FailedInstall(Sandbox):
+        def install(self,path,frozen):
+            if path.name=='candidate':raise ValueError('Candidate install failed')
+            super().install(path,frozen)
+    report=runner.run('unused',tmp_path/'result','sha256:'+'a'*64,
+                      sandbox_factory=FailedInstall,registry=registry,fixtures=lambda p:{})
+    assert report['status']=='blocked' and report['phase']=='candidate-install'
+    assert set(report['backend'])=={'baseline'}
+    assert report['candidate']=={}
     assert not (tmp_path/'result'/'package.json').exists()

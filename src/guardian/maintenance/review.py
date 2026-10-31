@@ -19,7 +19,7 @@ def make_report(value, site_id='estateplanning'):
     if parsed.tzinfo is None:
         raise ValueError('CI observation time must include timezone')
     observed = parsed.isoformat()
-    if value.get('version') != 1 or not re.fullmatch(r'[a-f0-9]{40}', value.get('base_sha', '')):
+    if value.get('version') not in (1,2) or not re.fullmatch(r'[a-f0-9]{40}', value.get('base_sha', '')):
         raise ValueError('Dependency verification identity missing')
     report = Report(run_id=uuid.uuid4().hex, site_id=site_id, started_at=now, finished_at=now,
                     tools={'dependency_review': '1', 'base_sha': value['base_sha']},
@@ -74,7 +74,8 @@ def make_report(value, site_id='estateplanning'):
     report.limitations = ['Imported CI observations; importing JSON does not prove trusted execution or authorize publication.',
                          'A newer release is not itself a vulnerability. Advisory presence does not prove exploitability.',
                          'Declared versions are not proof of every resolved transitive version; see the pinned lockfile and audit.',
-                         'Verification uses synthetic data, mocked services and cached font assets, not production credentials.']
+                         'Verification uses synthetic data and cached fonts; real-service coverage depends on the report version and backend evidence.',
+                         'Production credentials, customer data and live provider delivery are outside this verification.']
     if report.status != 'complete':
         report.limitations.append('Verification is incomplete; do not treat unexecuted stages as passing.')
     if not value.get('finished_at'):
