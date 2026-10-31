@@ -275,6 +275,13 @@ isolation/cleanup, 308 browser passes, zero failures/flaky cases and 88 skips.
 No Node 20 deprecation annotations appeared in either new run. SIS #5 is ready
 for owner review; no merge or deployment occurred.
 
+The follow-up diagnostic summary recognizes the existing public-accessibility
+test title only for approved public routes, extracts Axe IDs from a reviewed
+Deque v4.14.0 rule vocabulary, and retains source/project locations for failed
+and flaky tests. Raw prose, HTML, selectors and unknown route/ID values are not
+retained. Parsing failure never changes a test outcome or grants publishing.
+The owner has deferred review/merge of SIS #5; diagnostic work does not require it.
+
 Maintenance remains enabled as configured while post-trial weekly/manual
 preference is pending. Publishing remains explicitly off; its separate writer
 and activation are only relevant after successful paired verification.

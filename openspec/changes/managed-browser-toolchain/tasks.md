@@ -12,3 +12,6 @@ integration plus both real admin profiles, then correctly blocked on two public
 accessibility assertions. It did not verify the 14-update batch. Guardian PR #2
 remains draft pending bounded accessibility diagnosis; no gate was removed.
 SIS workflow-only PR #5 passed run 41203784493 and is ready for owner review.
+
+- [x] Add bounded public accessibility rule/route and flaky-location diagnostics.
+- [ ] Rerun the unchanged batch and diagnose the accessibility failures.

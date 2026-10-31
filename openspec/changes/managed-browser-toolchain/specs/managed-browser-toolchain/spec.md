@@ -29,3 +29,13 @@ SHALL NOT expose writer/model secrets or authorize publishing, regardless of fla
 #### Scenario: Preview report is verified while publishing flag is true
 - **WHEN** verification runs from a non-main branch
 - **THEN** publishing and model jobs SHALL be skipped and eligible SHALL be false
+
+### Requirement: Bounded browser diagnosis
+Browser summaries SHALL retain failed and retried source locations and recognized
+public accessibility routes/rule IDs without retaining arbitrary test prose,
+selectors, HTML or credentials. Diagnostic additions SHALL NOT change test gates.
+
+#### Scenario: An accessibility assertion fails after an upgrade
+- **WHEN** an approved public accessibility test reports an Axe violation
+- **THEN** the summary SHALL retain recognized rule IDs and its approved route
+- **AND** unknown routes, rule IDs and raw assertion content SHALL be omitted
