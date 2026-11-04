@@ -27,6 +27,28 @@ def test_incomplete_ci_is_not_clean_bill_of_health():
     assert report.evidence[0].details['candidate_passed_count']==0
 
 
+@pytest.mark.parametrize('status',['verified','no-compatible-updates'])
+def test_deferred_toolchain_is_a_visible_unverified_action_with_advisories(status):
+    value={'version':2,'base_sha':'a'*40,'status':status,
+        'releases':[{'package':'@playwright/test','section':'devDependencies','declared':'1.62.1','eligible':'1.62.1'}],
+        'deferred_updates':[{'package':'@playwright/test','section':'devDependencies','before':'1.62.1',
+                             'available':'1.64.1','reason':'browser-toolchain-review'}],
+        'advisories_before':[{'id':'1','package':'@playwright/test','severity':'high'}]}
+    report=make_report(value);payload,_=project_evidence(report)
+    assert report.findings[0].title.startswith('Browser toolchain review required:')
+    assert report.findings[0].severity=='high'
+    observation=payload['untrusted_evidence'][0]['observations']
+    assert observation['toolchain_review_required'] is True and observation['upgrade_verified'] is False
+    assert observation['eligible']=='1.64.1' and observation['advisory_count']==1
+
+
+def test_deferred_report_cannot_omit_its_matching_release_evidence():
+    with pytest.raises(ValueError,match='matching release evidence'):
+        make_report({'version':2,'base_sha':'a'*40,'status':'verified','deferred_updates':[
+            {'package':'@playwright/test','section':'devDependencies','before':'1.62.1',
+             'available':'1.64.1','reason':'browser-toolchain-review'}]})
+
+
 def test_public_registry_uses_fixed_origin_and_encoded_package():
     def handler(request):
         assert request.url.host=='registry.npmjs.org'

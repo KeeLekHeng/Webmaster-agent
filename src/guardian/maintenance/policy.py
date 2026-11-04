@@ -3,10 +3,12 @@ import hashlib
 import json
 import re
 from datetime import datetime, timezone, timedelta
+from pathlib import Path
 
 SECTIONS = ("dependencies", "devDependencies", "optionalDependencies")
 FILES = ("package.json", "pnpm-lock.yaml")
 STAGES = ("install", "lint", "typecheck", "unit", "build", "integration", "browser")
+BROWSER_PACKAGES = frozenset({'@playwright/test','playwright','playwright-core'})
 PACKAGE = re.compile(r"(?:@[a-z0-9][a-z0-9._-]*/)?[a-z0-9][a-z0-9._-]*")
 VERSION = re.compile(r"(0|[1-9]\d{0,5})\.(0|[1-9]\d{0,5})\.(0|[1-9]\d{0,5})")
 
@@ -30,6 +32,37 @@ def declared(value):
 
 def compatible(before, after):
     return after > before and before[0] == after[0] and (before[0] != 0 or before[1] == after[1])
+
+
+def toolchain_versions(trusted):
+    """The reviewed image, never the candidate manifest, owns browser versions."""
+    path=Path(trusted)/'Dockerfile'
+    if path.is_symlink() or not path.is_file() or path.stat().st_size>16384:
+        raise ValueError('Reviewed browser image unavailable')
+    lines=[line.split('#',1)[0].strip() for line in path.read_text(encoding='utf-8').splitlines()]
+    bases=[line for line in lines if re.match(r'FROM\s',line,re.I)]
+    match=re.fullmatch(r'FROM\s+mcr\.microsoft\.com/playwright:v([0-9.]+)-[a-z0-9]+',bases[0],re.I) if len(bases)==1 else None
+    if not match:raise ValueError('Reviewed browser image must have one stable pinned version')
+    version(match[1])
+    return {name:match[1] for name in sorted(BROWSER_PACKAGES)}
+
+
+def check_toolchain_inventory(inventory, reviewed, packages):
+    for name in BROWSER_PACKAGES.intersection(packages):
+        if inventory.get(name)!=reviewed.get(name):
+            raise ValueError('Resolved browser toolchain differs from reviewed image')
+
+
+def deferred_updates(items):
+    """Only bounded technical deferrals may reach reports or PR descriptions."""
+    if not isinstance(items,list) or len(items)>10:raise ValueError('Invalid deferred updates')
+    for item in items:
+        if (not isinstance(item,dict) or set(item)!={'package','section','before','available','reason'}
+            or item['package'] not in BROWSER_PACKAGES or item['section'] not in SECTIONS
+            or item['reason']!='browser-toolchain-review'):
+            raise ValueError('Invalid toolchain deferral')
+        declared(item['before']);declared(item['available'])
+    return items
 
 
 def manifest(raw):
@@ -63,6 +96,8 @@ def changes(before, after):
         for name, specification in a.items():
             if specification == b[name]:
                 continue
+            if name in BROWSER_PACKAGES:
+                raise ValueError('Browser toolchain changes require a separate reviewed update')
             prefix, previous = declared(specification)
             next_prefix, target = declared(b[name])
             if (prefix != next_prefix and next_prefix != '') or not compatible(previous, target):
@@ -163,6 +198,7 @@ def backend_verification(proof):
 def verification(report, *, require_backend=False):
     if report.get('version') not in (1,2) or not re.fullmatch(r'[a-f0-9]{40}', report.get('base_sha', '')):
         raise ValueError('Invalid verification identity')
+    deferred_updates(report.get('deferred_updates',[]))
     for kind in ('baseline', 'candidate'):
         if report.get(kind) != {stage: 'passed' for stage in STAGES}:
             raise ValueError('Every required baseline and candidate check must pass')

@@ -174,10 +174,11 @@ semantic behavior; these recipes do not guarantee correct migration logic.
 
 ## Current rollout status
 
-The real-service verifier is in [Guardian PR #1](https://github.com/KeeLekHeng/Webmaster-agent/pull/1) and vendored
-into [SIS CI setup PR #4](https://github.com/KeeLekHeng/sisweb/pull/4). This is a
+The owner merged [Guardian PR #1](https://github.com/KeeLekHeng/Webmaster-agent/pull/1)
+and [SIS CI setup PR #4](https://github.com/KeeLekHeng/sisweb/pull/4) on 31 October
+2026. Guardian main is `fb89a8f`; SIS main is `6d40faf`. This is a
 human-reviewed CI change; automatic dependency repairs cannot modify tests,
-configuration, backend or authentication code. No production/VPS changes occurred.
+configuration, backend or authentication code. Verification made no production/VPS changes.
 
 Controlled runs proved [standard startup/SQL](https://github.com/KeeLekHeng/sisweb/actions/runs/41028651056)
 and [bootstrap-to-internal isolation](https://github.com/KeeLekHeng/sisweb/actions/runs/41031844785).
@@ -208,13 +209,87 @@ dependency-upgrade proof.
 
 Review amendments consolidated repeated draft checks, bounded server shutdown
 and prevented baseline backend proof being relabelled after candidate install
-failure. Both PRs are ready for owner review as disabled-by-default setup changes.
+failure. Both PRs were merged as disabled-by-default setup changes.
 See the [merge/deployment order](dependency-maintenance-setup.md#review-merge-and-deploy).
 
-The PR-event check stops at the explicit bootstrap guard because the reviewed
-base does not yet contain four new verifier assets. This occurs before website
-installation/tests; it is distinct from the manual exact-head result. Initial
-setup still needs owner review/merge. A paired dependency-upgrade trial remains
-pending, needs a scoped SIS read-token secret in Guardian Actions, and must pass
-both copies before any dependency PR. Publishing needs its separate writer and
-explicit activation. Nothing here merges, deploys or activates the workflow.
+The pre-merge PR event stopped at the bootstrap guard because its reviewed base
+lacked four verifier assets. Post-merge [SIS main run 41180334440](https://github.com/KeeLekHeng/sisweb/actions/runs/41180334440)
+passed the guard, all seven stages, both admin profiles, isolation and cleanup.
+It recorded 307 expected browser passes, one flaky case that passed on retry and
+88 disclosed skips. That historical SIS summary omitted the retried case's
+identity. Later Guardian diagnostics retain retry locations but cannot reconstruct
+that old run. This is not a zero-flake claim; no gate changed for this run.
+
+The owner configured the scoped SIS reader and enabled verification. Guardian
+[trial 41191170056](https://github.com/KeeLekHeng/Webmaster-agent/actions/runs/41191170056)
+checked out SIS main successfully and passed every baseline stage, both admin
+profiles and cleanup (308 browser passes, zero flaky cases, 88 skips). It selected
+15 compatible upgrades. Candidate install/lint/types/unit/build and real backend
+service probes passed, but integration stopped at browser launch before the
+candidate browser/admin profiles could run. Candidate Playwright 1.64.1 differs
+from the reviewed image's 1.62.1 browser bundle; these versions must match.
+
+The batch introduced no new/worse reported advisory, but existing zod/high and
+minimatch/moderate findings remain. This is a blocked upgrade, not evidence that
+all 15 selected versions are verified. Publishing was skipped. No dependency PR,
+merge or deployment occurred. The owner approved separate reviewed browser-toolchain
+updates. Ordinary batches preserve `@playwright/test`, `playwright` and
+`playwright-core`, report available versions/advisories as explicit deferrals,
+and still require every baseline/candidate stage. The reviewed Dockerfile supplies
+the required version; installed baseline and candidate inventories must match it.
+The independent publisher rejects browser-package changes and inventory drift.
+Deferred updates are never described as verified or fixed.
+
+A browser upgrade requires a separate human-reviewed change coordinating the SIS
+manifest/lockfile, Guardian and SIS verifier images, and any reviewed visual
+references. Run the complete baseline/candidate checks; review reference changes
+explicitly rather than regenerating them to make a failed test pass.
+
+Manual workflow dispatch on a non-main Guardian branch is a read-only preview.
+It uses the scoped SIS reader but disables repairs, interpretation and publication.
+Both the workflow and publisher require exact `refs/heads/main` for publishing.
+The Node 24 action-pin refresh changes Actions' runtime, not the website runtime.
+
+Read-only [preview 41203746397](https://github.com/KeeLekHeng/Webmaster-agent/actions/runs/41203746397)
+tested controller `2435a95` against SIS `6d40faf`. It explicitly deferred
+Playwright 1.62.1 to 1.64.1 and selected the other 14 updates. Baseline passed all
+stages (307 expected browser passes, one retry/flaky pass, 88 disclosed skips).
+Candidate install/lint/types/unit/build/integration, both real admin profiles,
+isolation and cleanup passed. Browser execution then blocked on two accessibility
+assertions at `tests/e2e/search-discovery.spec.ts:158:7`, which expects zero Axe
+violations. Partial candidate counts were 68 expected, two unexpected and 326
+skipped after early termination; these are not complete-suite coverage.
+
+[Diagnostic run 41205217410](https://github.com/KeeLekHeng/Webmaster-agent/actions/runs/41205217410)
+repeated the same 14 updates and identified `label-content-name-mismatch` on `/`
+and `/will-writing`. Axe 4.14 enables this rule by default. The shared brand link
+overrides its visible motto with `aria-label="SIS home"`. After removing it,
+run 41206017601 identified the same defect on the mobile video control, whose
+fixed name omitted its visible Watch/Loading text. The separate source repair
+[SIS #6](https://github.com/KeeLekHeng/sisweb/pull/6) removes the brand override and
+shares the video's state-derived display/ARIA label in `66c1f70`; its status child
+alone cannot name the button. The keyboard locator follows the visible name;
+its focus/Enter assertions remain. [Paired preview 41207985799](https://github.com/KeeLekHeng/Webmaster-agent/actions/runs/41207985799)
+passed all seven stages for both copies and validated artifact hashes: baseline
+307 direct passes plus one retry; candidate 306 plus two retries; each had 88 skips
+and zero unexpected failures. Both admin profiles, isolation and cleanup passed.
+[SIS CI 41207971207](https://github.com/KeeLekHeng/sisweb/actions/runs/41207971207)
+passed on `66c1f70` / merge `21913c4`: 308 passes, 88 skips, zero failures/flakes.
+[Guardian #2](https://github.com/KeeLekHeng/Webmaster-agent/pull/2) and SIS #6 are
+ready for owner review. Publishing remains off; fresh merged-main proof is required.
+
+The separate workflow-only [SIS PR #5](https://github.com/KeeLekHeng/sisweb/pull/5)
+passed [run 41203784493](https://github.com/KeeLekHeng/sisweb/actions/runs/41203784493)
+on head `3b0b9c2` / merge checkout `2544c47`: all stages, both real admin profiles,
+isolation/cleanup, 308 browser passes, zero failures/flaky cases and 88 skips.
+Its review/merge is owner-deferred. No merge or deployment occurred.
+
+The follow-up diagnostic summary recognizes the existing public-accessibility
+test title only for approved public routes, extracts Axe IDs from a reviewed
+Deque v4.14.0 rule vocabulary, and retains source/project locations for failed
+and flaky tests. Raw prose, HTML, selectors and unknown route/ID values are not
+retained. Parsing failure never changes a test outcome or grants publishing.
+
+Maintenance remains enabled as configured while post-trial weekly/manual
+preference is pending. Publishing remains explicitly off; its separate writer
+and activation are only relevant after successful paired verification.

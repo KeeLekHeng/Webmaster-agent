@@ -86,6 +86,47 @@ class OutputBudgetFailure(CheckFailure):
         return result
 
 
+# Diagnostic vocabulary from Deque axe-core v4.14.0 lib/rules/*.json:
+# https://github.com/dequelabs/axe-core/tree/v4.14.0/lib/rules
+# An unknown identifier is omitted, never copied from untrusted error prose.
+AXE_RULES = frozenset('''accesskeys area-alt aria-allowed-attr aria-allowed-role
+aria-braille-equivalent aria-command-name aria-conditional-attr aria-deprecated-role
+aria-dialog-name aria-hidden-body aria-hidden-focus aria-input-field-name aria-meter-name
+aria-progressbar-name aria-prohibited-attr aria-required-attr aria-required-children
+aria-required-parent aria-roledescription aria-roles aria-tab-name aria-text
+aria-toggle-field-name aria-tooltip-name aria-treeitem-name aria-valid-attr aria-valid-attr-value
+audio-caption autocomplete-valid avoid-inline-spacing blink button-name bypass color-contrast
+color-contrast-enhanced css-orientation-lock definition-list dlitem document-title duplicate-id
+duplicate-id-active duplicate-id-aria empty-heading empty-table-header focus-order-semantics
+form-field-multiple-labels frame-focusable-content frame-tested frame-title frame-title-unique
+heading-order hidden-content html-has-lang html-lang-valid html-xml-lang-mismatch
+identical-links-same-purpose image-alt img-redundant-alt input-button-name input-image-alt
+label label-content-name-mismatch label-title-only landmark-banner-is-top-level
+landmark-complementary-is-top-level landmark-contentinfo-is-top-level landmark-main-is-top-level
+landmark-no-duplicate-banner landmark-no-duplicate-contentinfo landmark-no-duplicate-main
+landmark-one-main landmark-unique link-in-text-block link-name list listitem marquee
+meta-refresh meta-refresh-no-exceptions meta-viewport meta-viewport-large nested-interactive
+no-autoplay-audio object-alt p-as-heading page-has-heading-one presentation-role-conflict region
+role-img-alt scope-attr-valid scrollable-region-focusable select-name server-side-image-map
+skip-link summary-name svg-img-alt tabindex table-duplicate-name table-fake-caption target-size
+td-has-header td-headers-attr th-has-data-cells valid-lang video-caption'''.split())
+PUBLIC_ACCESSIBILITY_ROUTES = frozenset({
+    '/', '/will-writing', '/trust-planning', '/contact-us', '/blogs',
+    '/blogs/why-estate-planning-matters', '/careers', '/careers/admin-assistant',
+})
+
+
+def accessibility_details(spec, messages):
+    """Recognize the public Axe assertion; retain vocabulary, never page content."""
+    title=spec.get('title','')
+    if not isinstance(title,str) or not title.startswith('public accessibility '):return {}
+    route=title.removeprefix('public accessibility ')
+    if route not in PUBLIC_ACCESSIBILITY_ROUTES:return {}
+    text=re.sub(r'\x1b\[[0-9;]*m','', '\n'.join(messages))
+    ids=set(re.findall(r'(?m)^\s*\+?\s*"id":\s*"([a-z-]{1,80})"',text)) & AXE_RULES
+    return {'public_route':route,'axe_rule_ids':sorted(ids)[:20]}
+
+
 def browser_summary(workspace):
     """Extract only bounded counts/source locations and fixed error categories."""
     try:
@@ -95,7 +136,7 @@ def browser_summary(workspace):
         report = json.loads(path.read_bytes())
         stats = {k:v for k,v in report.get('stats',{}).items()
                  if k in {'expected','unexpected','flaky','skipped'} and type(v) is int and 0<=v<=100000}
-        failures = []
+        failures, flaky = [], []
         visited = 0
         def visit(suites, depth=0):
             nonlocal visited
@@ -107,7 +148,7 @@ def browser_summary(workspace):
                     visited+=1
                     if visited>10000: raise ValueError('Report test limit')
                     for test in spec.get('tests',[])[:10]:
-                        if test.get('status')!='unexpected': continue
+                        if test.get('status') not in {'unexpected','flaky'}: continue
                         file=spec.get('file','').removeprefix('/work/')
                         if '/' not in file: file='tests/e2e/'+file
                         if not re.fullmatch(r'tests/e2e/[A-Za-z0-9_/-]+\.spec\.tsx?',file): continue
@@ -121,7 +162,7 @@ def browser_summary(workspace):
                                 value=error.get('message','')
                                 if isinstance(value,str):
                                     messages.append(value[:10000])
-                                    matchers.update(name for name in ('toBeFocused','toBeVisible','toHaveCount','toHaveAttribute','toHaveScreenshot','toHaveURL') if name in value[:10000])
+                                    matchers.update(name for name in ('toEqual','toBeFocused','toBeVisible','toHaveCount','toHaveAttribute','toHaveScreenshot','toHaveURL') if name in value[:10000])
                                 location=error.get('location',{})
                                 if isinstance(location,dict):
                                     source=location.get('file','')
@@ -134,14 +175,16 @@ def browser_summary(workspace):
                                 if isinstance(stack,str):
                                     assertions.extend(re.findall(r'tests/e2e/[A-Za-z0-9_/-]+\.spec\.tsx?:\d+(?::\d+)?',stack[:20000]))
                         failure={'file':file,'line':line,'signals':CheckFailure('\n'.join(messages).encode()).diagnostics()['signals']}
+                        failure.update(accessibility_details(spec,messages))
                         if assertions:failure['assertion_locations']=sorted(set(assertions))[:5]
                         if matchers:failure['matchers']=sorted(matchers)
                         if test.get('projectName') in {'desktop-chromium','mobile-chromium','reduced-motion'}:
                             failure['project']=test['projectName']
-                        if len(failures)<10:failures.append(failure)
+                        target=flaky if test['status']=='flaky' else failures
+                        if len(target)<10:target.append(failure)
                 visit(suite.get('suites',[]),depth+1)
         visit(report.get('suites',[]))
-        return {'counts':stats,'failures':failures}
+        return {'counts':stats,'failures':failures,'flaky':flaky}
     except Exception:
         return {'status':'unavailable'}
 

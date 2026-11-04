@@ -33,7 +33,7 @@ def project_evidence(report):
     checks = {"http", "tls", "metadata", "security_headers", "health_payload", "collection", "redirect", "seo", "robots", "sitemap", "dependencies", "dependency_verification"}
     bool_keys = {"truncated", "hostname_and_chain_verified", "title_present",
                  "description_present", "canonical_present", "status_ok", "noindex", "canonical_outside_site", "present", "homepage_allowed_by_basic_parser",
-                 "upgrade_verified", "compatible_update_available", "transitive_review_required"}
+                 "upgrade_verified", "compatible_update_available", "transitive_review_required", "toolchain_review_required"}
     number_keys = {"status", "attempt", "days_remaining", "h1_count", "canonical_count", "location_count", "outside_site_count", "locations_fetched", "advisory_count", "required_stage_count", "baseline_passed_count", "candidate_passed_count"}
     known_missing = {"Strict-Transport-Security", "X-Content-Type-Options: nosniff",
                      "frame embedding restriction", "title", "description", "canonical"}

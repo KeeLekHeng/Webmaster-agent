@@ -22,7 +22,8 @@ class API:
 
 
 @pytest.fixture
-def artifact(tmp_path):
+def artifact(tmp_path,monkeypatch):
+    monkeypatch.delenv('GITHUB_ACTIONS',raising=False)
     old = {'packageManager':'pnpm@10.18.2','dependencies':{'example':'1.0.0'},'scripts':{'build':'next build'}}
     new = {**old, 'dependencies':{'example':'1.0.1'}}
     original = {'package.json':json.dumps(old).encode(), 'pnpm-lock.yaml':b'old lock\n'}
@@ -82,6 +83,43 @@ def test_routes_cannot_merge_or_write_default_branch():
     api=GitHub('synthetic')
     with pytest.raises(ValueError): api.request('PUT','/pulls/1/merge')
     with pytest.raises(ValueError): api.request('PATCH','/git/refs/heads/main',{})
+
+
+@pytest.mark.parametrize('ref',['refs/heads/feature','refs/heads/Main','refs/pull/2/merge',None])
+def test_ci_preview_cannot_publish_even_when_enabled(artifact,monkeypatch,ref):
+    path,api,_=artifact;monkeypatch.setenv('GITHUB_ACTIONS','true')
+    if ref is None:monkeypatch.delenv('GITHUB_REF',raising=False)
+    else:monkeypatch.setenv('GITHUB_REF',ref)
+    with pytest.raises(ValueError,match='previews cannot publish'):publish(path,fingerprint(path),api,enabled=True)
+    assert not api.calls
+
+
+@pytest.mark.parametrize('kind',['manifest-change','resolved-drift','deferred'])
+def test_toolchain_policy_is_independent_at_publishing(artifact,kind):
+    from pathlib import Path
+    from guardian.maintenance.policy import toolchain_versions
+    path,api,report=artifact;pin=toolchain_versions(Path('maintenance'))['@playwright/test']
+    parts=list(map(int,pin.split('.')));parts[-1]+=1;available='.'.join(map(str,parts))
+    original=json.loads(api.original['package.json']);original['dependencies']['@playwright/test']=pin
+    api.original['package.json']=json.dumps(original).encode()
+    candidate=json.loads((path/'package.json').read_bytes());candidate['dependencies']['@playwright/test']=available if kind=='manifest-change' else pin
+    raw=json.dumps(candidate).encode();(path/'package.json').write_bytes(raw)
+    report['files']['package.json']={'before_sha256':digest(api.original['package.json']),'after_sha256':digest(raw)}
+    report['resolved_before']={'example':'1.0.0','@playwright/test':pin}
+    report['resolved_after']={'example':'1.0.1','@playwright/test':available if kind=='resolved-drift' else pin}
+    if kind=='manifest-change':
+        report['updates'].insert(0,{'package':'@playwright/test','section':'dependencies','before':pin,'after':available})
+    report['deferred_updates']=[{'package':'@playwright/test','section':'dependencies','before':pin,
+                                 'available':available,'reason':'browser-toolchain-review'}]
+    (path/'verification.json').write_text(json.dumps(report))
+    if kind=='deferred':
+        assert publish(path,fingerprint(path),api,enabled=True)['status']=='published'
+        body=next(data['body'] for method,p,data in api.calls if method=='POST' and p=='/pulls')
+        assert 'Deferred browser-toolchain updates (not included or verified)' in body and available in body
+    else:
+        with pytest.raises(ValueError,match='Browser toolchain changes|Resolved browser toolchain'):
+            publish(path,fingerprint(path),api,enabled=True)
+        assert not any(method=='POST' for method,_,_ in api.calls)
 
 
 def test_base_moves_during_publication_no_branch_is_created(artifact):

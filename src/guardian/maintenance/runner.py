@@ -7,7 +7,7 @@ import tempfile
 from pathlib import Path
 from datetime import datetime, timezone
 
-from guardian.maintenance.policy import FILES, SECTIONS, STAGES, backend_verification, changes, declared, digest, manifest, security_gate, select, version
+from guardian.maintenance.policy import FILES, SECTIONS, STAGES, backend_verification, changes, check_toolchain_inventory, declared, digest, manifest, security_gate, select, toolchain_versions, version
 from guardian.maintenance.registry import metadata
 from guardian.maintenance.fixtures import font_fixture
 from guardian.maintenance.sandbox import Sandbox, CheckFailure, CheckTimeout, IntegrityFailure, command, export
@@ -22,7 +22,7 @@ def run(repository, output, image, *, sandbox_factory=Sandbox, registry=metadata
     report = {'version': 2, 'status': 'blocked', 'started_at': datetime.now(timezone.utc).isoformat(),
               'phase': 'export', 'baseline': {}, 'candidate': {}, 'updates': [],
               'image_id': image, 'security_not_worsened': False,
-              'backend': {},
+              'backend': {}, 'deferred_updates': [],
               'coverage': ['real-backend-required', 'synthetic-data', 'targeted-auth-failure-mocks', 'intercepted-email', 'cached-google-font', 'no-production-access'],
               'limits': ['Tests are evidence for covered behavior, not a guarantee of all live integrations.',
                          'Extensive legacy admin UI suites remain skipped; separate real MFA and password-only UAT draft probes are required.',
@@ -41,7 +41,10 @@ def run(repository, output, image, *, sandbox_factory=Sandbox, registry=metadata
             fixture_path = root / 'fixtures'
             report['phase'] = 'prepare-font-fixture'
             report['font_fixtures'] = fixtures(fixture_path)
-            sandbox = sandbox_factory(image, fixture_path, Path(__file__).resolve().parents[3] / 'maintenance')
+            trusted=Path(__file__).resolve().parents[3]/'maintenance'
+            reviewed=toolchain_versions(trusted)
+            report['toolchain_versions']=reviewed
+            sandbox = sandbox_factory(image, fixture_path, trusted)
             baseline, candidate = root / 'baseline', root / 'candidate'
             shutil.copytree(source, baseline)
             shutil.copytree(source, candidate)
@@ -51,6 +54,7 @@ def run(repository, output, image, *, sandbox_factory=Sandbox, registry=metadata
             report['phase'] = 'baseline-audit-inventory'
             before = sandbox.audit(baseline)
             installed = sandbox.inventory(baseline, current)
+            check_toolchain_inventory(installed,reviewed,installed)
             report['resolved_before'] = installed
             report['advisories_before'] = before
             # Analyze declared stable bounds; frozen baseline and dependency inventories
@@ -62,6 +66,11 @@ def run(repository, output, image, *, sandbox_factory=Sandbox, registry=metadata
                 for name, specification in current.get(section, {}).items():
                     info = registry(name)
                     target = select(specification, info, name in urgent, installed=installed[name])
+                    if name in reviewed:
+                        if target!=specification or name in urgent:
+                            report['deferred_updates'].append({'package':name,'section':section,'before':specification,
+                                'available':target,'reason':'browser-toolchain-review'})
+                        target=specification
                     report['releases'].append({'package': name, 'section': section, 'declared': specification,
                                                'installed': installed[name], 'eligible': target,
                                                'latest': info.get('dist-tags', {}).get('latest', '')})
@@ -85,6 +94,7 @@ def run(repository, output, image, *, sandbox_factory=Sandbox, registry=metadata
             report['phase'] = 'candidate-audit-inventory'
             after = sandbox.audit(candidate)
             resolved_after = sandbox.inventory(candidate, current)
+            check_toolchain_inventory(resolved_after,reviewed,installed)
             report['resolved_after'] = resolved_after
             if any(version(resolved_after[u['package']]) != declared(u['after'])[1] for u in report['updates']):
                 raise ValueError('Resolved candidate differs from selected exact upgrade')
